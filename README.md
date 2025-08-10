@@ -2,15 +2,15 @@
 
 A lightweight S3-compatible storage server designed for **multi-project development** with **zero cognitive overhead**.
 
-## 🚀 Why S3pit? 
+## 🚀 Why S3pit?
 
 **The Problem**: Working on multiple applications simultaneously with traditional S3 solutions (MinIO, LocalStack) requires:
 - Managing separate storage instances per project
-- Remembering different ports and configurations  
+- Remembering different ports and configurations
 - Complex Docker setups that consume resources
 - Isolated storage that's disconnected from your codebase
 
-**The S3pit Solution**: 
+**The S3pit Solution**:
 - ✅ **One server, multiple projects**: Single S3pit instance serves all your projects
 - ✅ **Flexible storage options**: Repository-local (`~/project/data/`) OR centralized (`~/s3pit/data/`) - your choice
 - ✅ **Descriptive access keys**: Use meaningful accessKeyIds like `"user-uploads-dev"` for easy project identification
@@ -41,7 +41,7 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
 **Option A: Repository-Local Storage** (each project's data in its own repo)
 ```json
 {
-  "globalDirectory": "~/s3data",
+  "globalDirectory": "~/s3pit",
   "tenants": [
     {
       "accessKeyId": "ecommerce-dev",
@@ -52,7 +52,7 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
     },
     {
       "accessKeyId": "blog-dev",
-      "secretAccessKey": "blog-secret", 
+      "secretAccessKey": "blog-secret",
       "customDirectory": "~/src/github.com/yourname/blog-platform/data",
       "description": "Blog platform development",
       "publicBuckets": ["public-assets"]
@@ -60,7 +60,7 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
     {
       "accessKeyId": "images-dev",
       "secretAccessKey": "images-secret",
-      "customDirectory": "~/src/github.com/yourname/image-processor/data", 
+      "customDirectory": "~/src/github.com/yourname/image-processor/data",
       "description": "Image processor development",
       "publicBuckets": []
     }
@@ -71,7 +71,7 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
 **Option B: Centralized Storage** (all projects under one directory)
 ```json
 {
-  "globalDirectory": "~/s3data",
+  "globalDirectory": "~/s3pit",
   "tenants": [
     {
       "accessKeyId": "ecommerce-dev",
@@ -79,7 +79,7 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
       "description": "E-commerce app development"
     },
     {
-      "accessKeyId": "blog-dev", 
+      "accessKeyId": "blog-dev",
       "secretAccessKey": "blog-secret",
       "description": "Blog platform development"
     },
@@ -93,9 +93,9 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
 ```
 
 > **💡 Auto-Organization**: When `customDirectory` is omitted, S3pit automatically organizes projects under the global `globalDirectory`:
-> - `ecommerce-dev` → `~/s3data/ecommerce-dev/`
-> - `blog-dev` → `~/s3data/blog-dev/`  
-> - `images-dev` → `~/s3data/images-dev/`
+> - `ecommerce-dev` → `~/s3pit/ecommerce-dev/`
+> - `blog-dev` → `~/s3pit/blog-dev/`
+> - `images-dev` → `~/s3pit/images-dev/`
 
 **🎯 Pro Tip**: Use descriptive `accessKeyId` names for easy project identification! Each access key provides an isolated bucket namespace where you can create any bucket names you need. For example:
 - `accessKeyId: "user-uploads-dev"` → Isolated storage for buckets like `avatars`, `documents`, `temp-files`
@@ -130,7 +130,7 @@ npm run dev  # Uploads go to ./data/ in THIS project
 
 # Result: Each project's S3 data lives in its own repository folder!
 ls ~/src/github.com/yourname/ecommerce-app/data/     # E-commerce buckets
-ls ~/src/github.com/yourname/blog-platform/data/    # Blog buckets  
+ls ~/src/github.com/yourname/blog-platform/data/    # Blog buckets
 ```
 
 **Option B: Centralized Storage** (when using global `globalDirectory`)
@@ -138,21 +138,21 @@ ls ~/src/github.com/yourname/blog-platform/data/    # Blog buckets
 # Project 1: E-commerce app
 export AWS_ACCESS_KEY_ID=ecommerce-dev
 export AWS_SECRET_ACCESS_KEY=ecommerce-secret
-npm run dev  # Uploads go to ~/s3data/ecommerce-dev/
+npm run dev  # Uploads go to ~/s3pit/ecommerce-dev/
 
 # Project 2: Blog platform (different terminal)
 export AWS_ACCESS_KEY_ID=blog-dev
 export AWS_SECRET_ACCESS_KEY=blog-secret
-npm run dev  # Uploads go to ~/s3data/blog-dev/
+npm run dev  # Uploads go to ~/s3pit/blog-dev/
 
 # Result: All projects organized under one directory by accessKeyId
-ls ~/s3data/ecommerce-dev/     # E-commerce buckets
-ls ~/s3data/blog-dev/          # Blog buckets
+ls ~/s3pit/ecommerce-dev/     # E-commerce buckets
+ls ~/s3pit/blog-dev/          # Blog buckets
 ```
 
-**The Result**: 
+**The Result**:
 - 🎯 **Focus on coding**, not infrastructure management
-- 🚀 **Instant project switching** without reconfiguration  
+- 🚀 **Instant project switching** without reconfiguration
 - 📁 **Flexible organization** - choose repository-local OR centralized storage
 - 🔄 **Team synchronization** - same setup works for everyone
 - 💻 **Resource efficient** - one lightweight process serves everything
@@ -481,7 +481,7 @@ Default `tenants.json` created at `~/.config/s3pit/tenants.json`:
 **Configuration Properties:**
 - `globalDirectory` (string, required): Global data directory for all tenants. Must be absolute path (starting with `/`) or home directory path (starting with `~/`)
 - `accessKeyId` (string, required): Access key identifier for authentication
-- `secretAccessKey` (string, required): Secret access key for authentication  
+- `secretAccessKey` (string, required): Secret access key for authentication
 - `customDirectory` (string, optional): Tenant-specific storage directory path. If omitted, uses `{globalDirectory}/{accessKeyId}/`. Must be absolute path (starting with `/`) or home directory path (starting with `~/`)
 - `description` (string, optional): Human-readable description of the tenant
 - `publicBuckets` (array, optional): List of bucket names that allow public access without authentication
@@ -494,7 +494,7 @@ S3pit's unique selling point is **flexible directory mapping** that reduces cogn
 
 ```json
 {
-  "globalDirectory": "~/s3data",
+  "globalDirectory": "~/s3pit",
   "tenants": [
     {
       "accessKeyId": "app1-dev",
@@ -504,7 +504,7 @@ S3pit's unique selling point is **flexible directory mapping** that reduces cogn
       "publicBuckets": []
     },
     {
-      "accessKeyId": "app2-dev", 
+      "accessKeyId": "app2-dev",
       "secretAccessKey": "app2-secret",
       "customDirectory": "~/src/github.com/example-user/app2/data",
       "description": "App2 development storage",
@@ -528,7 +528,7 @@ S3pit's unique selling point is **flexible directory mapping** that reduces cogn
 cd ~/src/github.com/example-user/app1
 npm run dev  # App uses app1-dev credentials, stores in ./data/
 
-cd ~/src/github.com/example-user/app2  
+cd ~/src/github.com/example-user/app2
 npm run dev  # App uses app2-dev credentials, stores in ./data/
 
 # No mental overhead switching between projects!
@@ -589,7 +589,7 @@ S3pit uses a simple priority system to determine where to store data:
 ```bash
 # Configuration:
 {
-  "globalDirectory": "~/s3data",
+  "globalDirectory": "~/s3pit",
   "tenants": [
     {"accessKeyId": "project-a", ...},                    # Uses global globalDirectory
     {"accessKeyId": "project-b", "customDirectory": "~/myapp/data", ...}  # Uses specific directory
@@ -597,7 +597,7 @@ S3pit uses a simple priority system to determine where to store data:
 }
 
 # Storage paths:
-# project-a uploads → ~/s3data/project-a/my-bucket/file.txt
+# project-a uploads → ~/s3pit/project-a/my-bucket/file.txt
 # project-b uploads → ~/myapp/data/my-bucket/file.txt
 ```
 
