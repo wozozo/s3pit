@@ -1,0 +1,808 @@
+package storage
+
+import (
+	"crypto/md5"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+)
+
+type FileSystemStorage struct {
+	baseDir  string
+	mu       sync.RWMutex
+	uploads  map[string]*MultipartUpload // uploadId -> upload
+	uploadMu sync.RWMutex
+}
+
+func NewFileSystemStorage(baseDir string) (Storage, error) {
+	absPath, err := filepath.Abs(baseDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+	
+	if err := os.MkdirAll(absPath, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create base directory: %w", err)
+	}
+	
+	return &FileSystemStorage{
+		baseDir: absPath,
+		uploads: make(map[string]*MultipartUpload),
+	}, nil
+}
+
+func (fs *FileSystemStorage) CreateBucket(bucket string) (bool, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	
+	if _, err := os.Stat(bucketPath); err == nil {
+		return false, nil
+	}
+	
+	if err := os.MkdirAll(bucketPath, 0755); err != nil {
+		return false, fmt.Errorf("failed to create bucket directory: %w", err)
+	}
+	
+	metaPath := filepath.Join(bucketPath, ".s3pit_bucket_meta.json")
+	meta := map[string]interface{}{
+		"created": time.Now().UTC(),
+		"name":    bucket,
+	}
+	
+	data, err := json.Marshal(meta)
+	if err != nil {
+		return false, err
+	}
+	
+	if err := os.WriteFile(metaPath, data, 0644); err != nil {
+		return false, err
+	}
+	
+	return true, nil
+}
+
+func (fs *FileSystemStorage) DeleteBucket(bucket string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		return ErrBucketNotFound
+	}
+	
+	entries, err := os.ReadDir(bucketPath)
+	if err != nil {
+		return err
+	}
+	
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), ".s3pit_") {
+			return ErrBucketNotEmpty
+		}
+	}
+	
+	return os.RemoveAll(bucketPath)
+}
+
+func (fs *FileSystemStorage) ListBuckets() ([]BucketInfo, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	
+	entries, err := os.ReadDir(fs.baseDir)
+	if err != nil {
+		return nil, err
+	}
+	
+	var buckets []BucketInfo
+	for _, entry := range entries {
+		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			
+			creationTime := info.ModTime()
+			metaPath := filepath.Join(fs.baseDir, entry.Name(), ".s3pit_bucket_meta.json")
+			if data, err := os.ReadFile(metaPath); err == nil {
+				var meta map[string]interface{}
+				if json.Unmarshal(data, &meta) == nil {
+					if created, ok := meta["created"].(string); ok {
+						if t, err := time.Parse(time.RFC3339, created); err == nil {
+							creationTime = t
+						}
+					}
+				}
+			}
+			
+			buckets = append(buckets, BucketInfo{
+				Name:         entry.Name(),
+				CreationDate: creationTime,
+			})
+		}
+	}
+	
+	return buckets, nil
+}
+
+func (fs *FileSystemStorage) BucketExists(bucket string) (bool, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	_, err := os.Stat(bucketPath)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func (fs *FileSystemStorage) PutObject(bucket, key string, reader io.Reader, size int64, contentType string) (string, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	objectPath := filepath.Join(fs.baseDir, bucket, key)
+	objectDir := filepath.Dir(objectPath)
+	
+	if err := os.MkdirAll(objectDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create object directory: %w", err)
+	}
+	
+	tempFile, err := os.CreateTemp(objectDir, ".upload_*")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tempPath := tempFile.Name()
+	
+	hash := md5.New()
+	writer := io.MultiWriter(tempFile, hash)
+	
+	if _, err := io.Copy(writer, reader); err != nil {
+		tempFile.Close()
+		os.Remove(tempPath)
+		return "", fmt.Errorf("failed to write object data: %w", err)
+	}
+	
+	if err := tempFile.Close(); err != nil {
+		os.Remove(tempPath)
+		return "", err
+	}
+	
+	if err := os.Rename(tempPath, objectPath); err != nil {
+		os.Remove(tempPath)
+		return "", fmt.Errorf("failed to move object to final location: %w", err)
+	}
+	
+	etag := hex.EncodeToString(hash.Sum(nil))
+	
+	metaPath := objectPath + ".s3pit_meta.json"
+	meta := map[string]interface{}{
+		"content-type": contentType,
+		"etag":         etag,
+		"size":         size,
+		"modified":     time.Now().UTC(),
+	}
+	
+	data, err := json.Marshal(meta)
+	if err != nil {
+		return etag, nil
+	}
+	
+	os.WriteFile(metaPath, data, 0644)
+	
+	return fmt.Sprintf("\"%s\"", etag), nil
+}
+
+func (fs *FileSystemStorage) GetObject(bucket, key string) (io.ReadCloser, *ObjectMetadata, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	
+	objectPath := filepath.Join(fs.baseDir, bucket, key)
+	
+	file, err := os.Open(objectPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, ErrObjectNotFound
+		}
+		return nil, nil, err
+	}
+	
+	stat, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, nil, err
+	}
+	
+	meta := &ObjectMetadata{
+		Size:         stat.Size(),
+		LastModified: stat.ModTime(),
+		ContentType:  "application/octet-stream",
+	}
+	
+	metaPath := objectPath + ".s3pit_meta.json"
+	if data, err := os.ReadFile(metaPath); err == nil {
+		var storedMeta map[string]interface{}
+		if json.Unmarshal(data, &storedMeta) == nil {
+			if ct, ok := storedMeta["content-type"].(string); ok {
+				meta.ContentType = ct
+			}
+			if etag, ok := storedMeta["etag"].(string); ok {
+				if !strings.HasPrefix(etag, "\"") {
+					etag = fmt.Sprintf("\"%s\"", etag)
+				}
+				meta.ETag = etag
+			}
+		}
+	}
+	
+	if meta.ETag == "" {
+		hash := md5.New()
+		if tempFile, err := os.Open(objectPath); err == nil {
+			io.Copy(hash, tempFile)
+			tempFile.Close()
+			meta.ETag = fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
+		}
+	}
+	
+	return file, meta, nil
+}
+
+func (fs *FileSystemStorage) GetObjectMetadata(bucket, key string) (*ObjectMetadata, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	
+	objectPath := filepath.Join(fs.baseDir, bucket, key)
+	
+	stat, err := os.Stat(objectPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, ErrObjectNotFound
+		}
+		return nil, err
+	}
+	
+	meta := &ObjectMetadata{
+		Size:         stat.Size(),
+		LastModified: stat.ModTime(),
+		ContentType:  "application/octet-stream",
+	}
+	
+	metaPath := objectPath + ".s3pit_meta.json"
+	if data, err := os.ReadFile(metaPath); err == nil {
+		var storedMeta map[string]interface{}
+		if json.Unmarshal(data, &storedMeta) == nil {
+			if ct, ok := storedMeta["content-type"].(string); ok {
+				meta.ContentType = ct
+			}
+			if etag, ok := storedMeta["etag"].(string); ok {
+				if !strings.HasPrefix(etag, "\"") {
+					etag = fmt.Sprintf("\"%s\"", etag)
+				}
+				meta.ETag = etag
+			}
+		}
+	}
+	
+	if meta.ETag == "" {
+		hash := md5.New()
+		if file, err := os.Open(objectPath); err == nil {
+			io.Copy(hash, file)
+			file.Close()
+			meta.ETag = fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
+		}
+	}
+	
+	return meta, nil
+}
+
+func (fs *FileSystemStorage) DeleteObject(bucket, key string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	objectPath := filepath.Join(fs.baseDir, bucket, key)
+	
+	if err := os.Remove(objectPath); err != nil {
+		if os.IsNotExist(err) {
+			return ErrObjectNotFound
+		}
+		return err
+	}
+	
+	metaPath := objectPath + ".s3pit_meta.json"
+	os.Remove(metaPath)
+	
+	return nil
+}
+
+func (fs *FileSystemStorage) ListObjects(bucket, prefix, delimiter string, maxKeys int, continuationToken string) ([]ObjectInfo, []string, string, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		return nil, nil, "", ErrBucketNotFound
+	}
+	
+	var objects []ObjectInfo
+	commonPrefixes := make(map[string]bool)
+	
+	startAfter := continuationToken
+	
+	err := filepath.Walk(bucketPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		
+		if info.IsDir() || strings.Contains(info.Name(), ".s3pit_") {
+			return nil
+		}
+		
+		relPath, err := filepath.Rel(bucketPath, path)
+		if err != nil {
+			return nil
+		}
+		
+		key := filepath.ToSlash(relPath)
+		
+		if prefix != "" && !strings.HasPrefix(key, prefix) {
+			return nil
+		}
+		
+		if startAfter != "" && key <= startAfter {
+			return nil
+		}
+		
+		if delimiter != "" && prefix != "" {
+			afterPrefix := strings.TrimPrefix(key, prefix)
+			if idx := strings.Index(afterPrefix, delimiter); idx >= 0 {
+				commonPrefix := prefix + afterPrefix[:idx+len(delimiter)]
+				commonPrefixes[commonPrefix] = true
+				return nil
+			}
+		} else if delimiter != "" {
+			if idx := strings.Index(key, delimiter); idx >= 0 {
+				commonPrefix := key[:idx+len(delimiter)]
+				commonPrefixes[commonPrefix] = true
+				return nil
+			}
+		}
+		
+		etag := ""
+		metaPath := path + ".s3pit_meta.json"
+		if data, err := os.ReadFile(metaPath); err == nil {
+			var meta map[string]interface{}
+			if json.Unmarshal(data, &meta) == nil {
+				if e, ok := meta["etag"].(string); ok {
+					etag = e
+				}
+			}
+		}
+		
+		if etag == "" {
+			hash := md5.New()
+			if file, err := os.Open(path); err == nil {
+				io.Copy(hash, file)
+				file.Close()
+				etag = fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
+			}
+		}
+		
+		objects = append(objects, ObjectInfo{
+			Key:          key,
+			Size:         info.Size(),
+			LastModified: info.ModTime(),
+			ETag:         etag,
+		})
+		
+		return nil
+	})
+	
+	if err != nil {
+		return nil, nil, "", err
+	}
+	
+	sort.Slice(objects, func(i, j int) bool {
+		return objects[i].Key < objects[j].Key
+	})
+	
+	var nextToken string
+	if len(objects) > maxKeys {
+		nextToken = objects[maxKeys-1].Key
+		objects = objects[:maxKeys]
+	}
+	
+	var prefixes []string
+	for p := range commonPrefixes {
+		prefixes = append(prefixes, p)
+	}
+	sort.Strings(prefixes)
+	
+	return objects, prefixes, nextToken, nil
+}
+
+func (fs *FileSystemStorage) CopyObject(srcBucket, srcKey, dstBucket, dstKey string) (string, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	srcPath := filepath.Join(fs.baseDir, srcBucket, srcKey)
+	dstPath := filepath.Join(fs.baseDir, dstBucket, dstKey)
+	
+	srcFile, err := os.Open(srcPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", ErrObjectNotFound
+		}
+		return "", err
+	}
+	defer srcFile.Close()
+	
+	dstDir := filepath.Dir(dstPath)
+	if err := os.MkdirAll(dstDir, 0755); err != nil {
+		return "", err
+	}
+	
+	dstFile, err := os.Create(dstPath)
+	if err != nil {
+		return "", err
+	}
+	defer dstFile.Close()
+	
+	hash := md5.New()
+	writer := io.MultiWriter(dstFile, hash)
+	
+	if _, err := io.Copy(writer, srcFile); err != nil {
+		return "", err
+	}
+	
+	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
+	
+	srcMetaPath := srcPath + ".s3pit_meta.json"
+	dstMetaPath := dstPath + ".s3pit_meta.json"
+	
+	if srcMetaData, err := os.ReadFile(srcMetaPath); err == nil {
+		var meta map[string]interface{}
+		if json.Unmarshal(srcMetaData, &meta) == nil {
+			meta["etag"] = strings.Trim(etag, "\"")
+			meta["modified"] = time.Now().UTC()
+			
+			if data, err := json.Marshal(meta); err == nil {
+				os.WriteFile(dstMetaPath, data, 0644)
+			}
+		}
+	}
+	
+	return etag, nil
+}
+
+// InitiateMultipartUpload starts a new multipart upload
+func (fs *FileSystemStorage) InitiateMultipartUpload(bucket, key string) (string, error) {
+	fs.mu.RLock()
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		fs.mu.RUnlock()
+		return "", ErrBucketNotFound
+	}
+	fs.mu.RUnlock()
+	
+	uploadId := fmt.Sprintf("upload-%d-%s", time.Now().UnixNano(), key)
+	
+	fs.uploadMu.Lock()
+	defer fs.uploadMu.Unlock()
+	
+	fs.uploads[uploadId] = &MultipartUpload{
+		Bucket:    bucket,
+		Key:       key,
+		UploadId:  uploadId,
+		Initiated: time.Now().UTC(),
+		Parts:     make(map[int]PartInfo),
+	}
+	
+	// Create temporary directory for parts
+	tempDir := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId)
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		delete(fs.uploads, uploadId)
+		return "", fmt.Errorf("failed to create upload directory: %w", err)
+	}
+	
+	return uploadId, nil
+}
+
+// UploadPart uploads a part for a multipart upload
+func (fs *FileSystemStorage) UploadPart(bucket, key, uploadId string, partNumber int, reader io.Reader, size int64) (string, error) {
+	fs.uploadMu.RLock()
+	upload, exists := fs.uploads[uploadId]
+	fs.uploadMu.RUnlock()
+	
+	if !exists {
+		return "", fmt.Errorf("upload not found: %s", uploadId)
+	}
+	
+	if upload.Bucket != bucket || upload.Key != key {
+		return "", fmt.Errorf("upload mismatch")
+	}
+	
+	// Save part to temporary file
+	partPath := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId, fmt.Sprintf("part-%d", partNumber))
+	
+	partFile, err := os.Create(partPath)
+	if err != nil {
+		return "", err
+	}
+	defer partFile.Close()
+	
+	hash := md5.New()
+	writer := io.MultiWriter(partFile, hash)
+	
+	written, err := io.CopyN(writer, reader, size)
+	if err != nil && err != io.EOF {
+		return "", err
+	}
+	
+	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
+	
+	fs.uploadMu.Lock()
+	defer fs.uploadMu.Unlock()
+	
+	upload.Parts[partNumber] = PartInfo{
+		PartNumber:   partNumber,
+		Size:         written,
+		ETag:         etag,
+		LastModified: time.Now().UTC(),
+	}
+	
+	return etag, nil
+}
+
+// CompleteMultipartUpload completes a multipart upload
+func (fs *FileSystemStorage) CompleteMultipartUpload(bucket, key, uploadId string, parts []CompletedPart) (string, error) {
+	fs.uploadMu.Lock()
+	upload, exists := fs.uploads[uploadId]
+	if !exists {
+		fs.uploadMu.Unlock()
+		return "", fmt.Errorf("upload not found: %s", uploadId)
+	}
+	delete(fs.uploads, uploadId)
+	fs.uploadMu.Unlock()
+	
+	if upload.Bucket != bucket || upload.Key != key {
+		return "", fmt.Errorf("upload mismatch")
+	}
+	
+	// Ensure all parts are present
+	for _, part := range parts {
+		if _, ok := upload.Parts[part.PartNumber]; !ok {
+			return "", fmt.Errorf("part %d not found", part.PartNumber)
+		}
+	}
+	
+	// Sort parts by part number
+	sort.Slice(parts, func(i, j int) bool {
+		return parts[i].PartNumber < parts[j].PartNumber
+	})
+	
+	// Create the final object
+	objectPath := filepath.Join(fs.baseDir, bucket, key)
+	if err := os.MkdirAll(filepath.Dir(objectPath), 0755); err != nil {
+		return "", err
+	}
+	
+	finalFile, err := os.Create(objectPath)
+	if err != nil {
+		return "", err
+	}
+	defer finalFile.Close()
+	
+	hash := md5.New()
+	writer := io.MultiWriter(finalFile, hash)
+	
+	// Concatenate all parts
+	var totalSize int64
+	for _, part := range parts {
+		partPath := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId, fmt.Sprintf("part-%d", part.PartNumber))
+		partFile, err := os.Open(partPath)
+		if err != nil {
+			return "", err
+		}
+		
+		written, err := io.Copy(writer, partFile)
+		if err != nil {
+			partFile.Close()
+			return "", err
+		}
+		partFile.Close()
+		totalSize += written
+	}
+	
+	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
+	
+	// Save metadata
+	meta := map[string]interface{}{
+		"size":         totalSize,
+		"content_type": "application/octet-stream",
+		"etag":         strings.Trim(etag, "\""),
+		"modified":     time.Now().UTC(),
+	}
+	
+	metaPath := objectPath + ".s3pit_meta.json"
+	metaData, _ := json.Marshal(meta)
+	os.WriteFile(metaPath, metaData, 0644)
+	
+	// Clean up temporary files
+	tempDir := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId)
+	os.RemoveAll(tempDir)
+	
+	return etag, nil
+}
+
+// AbortMultipartUpload cancels a multipart upload
+func (fs *FileSystemStorage) AbortMultipartUpload(bucket, key, uploadId string) error {
+	fs.uploadMu.Lock()
+	upload, exists := fs.uploads[uploadId]
+	if !exists {
+		fs.uploadMu.Unlock()
+		return fmt.Errorf("upload not found: %s", uploadId)
+	}
+	delete(fs.uploads, uploadId)
+	fs.uploadMu.Unlock()
+	
+	if upload.Bucket != bucket || upload.Key != key {
+		return fmt.Errorf("upload mismatch")
+	}
+	
+	// Clean up temporary files
+	tempDir := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId)
+	return os.RemoveAll(tempDir)
+}
+
+// ListParts lists the parts of a multipart upload
+func (fs *FileSystemStorage) ListParts(bucket, key, uploadId string) ([]PartInfo, error) {
+	fs.uploadMu.RLock()
+	defer fs.uploadMu.RUnlock()
+	
+	upload, exists := fs.uploads[uploadId]
+	if !exists {
+		return nil, fmt.Errorf("upload not found: %s", uploadId)
+	}
+	
+	if upload.Bucket != bucket || upload.Key != key {
+		return nil, fmt.Errorf("upload mismatch")
+	}
+	
+	var parts []PartInfo
+	for _, part := range upload.Parts {
+		parts = append(parts, part)
+	}
+	
+	sort.Slice(parts, func(i, j int) bool {
+		return parts[i].PartNumber < parts[j].PartNumber
+	})
+	
+	return parts, nil
+}
+
+// CORS operations
+func (fs *FileSystemStorage) PutBucketCors(bucket string, cors *CorsConfiguration) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		return ErrBucketNotFound
+	}
+	
+	corsPath := filepath.Join(bucketPath, ".s3pit_cors.json")
+	data, err := json.MarshalIndent(cors, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal CORS configuration: %w", err)
+	}
+	
+	return os.WriteFile(corsPath, data, 0644)
+}
+
+func (fs *FileSystemStorage) GetBucketCors(bucket string) (*CorsConfiguration, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		return nil, ErrBucketNotFound
+	}
+	
+	corsPath := filepath.Join(bucketPath, ".s3pit_cors.json")
+	data, err := os.ReadFile(corsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // No CORS configuration
+		}
+		return nil, fmt.Errorf("failed to read CORS configuration: %w", err)
+	}
+	
+	var cors CorsConfiguration
+	if err := json.Unmarshal(data, &cors); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal CORS configuration: %w", err)
+	}
+	
+	return &cors, nil
+}
+
+func (fs *FileSystemStorage) DeleteBucketCors(bucket string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		return ErrBucketNotFound
+	}
+	
+	corsPath := filepath.Join(bucketPath, ".s3pit_cors.json")
+	err := os.Remove(corsPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete CORS configuration: %w", err)
+	}
+	
+	return nil
+}
+
+// Policy operations
+func (fs *FileSystemStorage) PutBucketPolicy(bucket string, policy string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		return ErrBucketNotFound
+	}
+	
+	policyPath := filepath.Join(bucketPath, ".s3pit_policy.json")
+	return os.WriteFile(policyPath, []byte(policy), 0644)
+}
+
+func (fs *FileSystemStorage) GetBucketPolicy(bucket string) (string, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		return "", ErrBucketNotFound
+	}
+	
+	policyPath := filepath.Join(bucketPath, ".s3pit_policy.json")
+	data, err := os.ReadFile(policyPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil // No policy
+		}
+		return "", fmt.Errorf("failed to read policy: %w", err)
+	}
+	
+	return string(data), nil
+}
+
+func (fs *FileSystemStorage) DeleteBucketPolicy(bucket string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	
+	bucketPath := filepath.Join(fs.baseDir, bucket)
+	if _, err := os.Stat(bucketPath); os.IsNotExist(err) {
+		return ErrBucketNotFound
+	}
+	
+	policyPath := filepath.Join(bucketPath, ".s3pit_policy.json")
+	err := os.Remove(policyPath)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete policy: %w", err)
+	}
+	
+	return nil
+}

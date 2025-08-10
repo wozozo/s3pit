@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3pit Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>S3pit Dashboard</h1>
+            <nav>
+                <button @click="activeTab = 'buckets'" :class="{active: activeTab === 'buckets'}">Buckets</button>
+                <button @click="activeTab = 'objects'" :class="{active: activeTab === 'objects'}">Objects</button>
+                <button @click="activeTab = 'presigned'" :class="{active: activeTab === 'presigned'}">Presigned URLs</button>
+                <button @click="activeTab = 'tenants'" :class="{active: activeTab === 'tenants'}">Tenants</button>
+                <button @click="activeTab = 'logs'" :class="{active: activeTab === 'logs'}">API Logs</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Buckets Tab -->
+            <div v-if="activeTab === 'buckets'" class="tab-content">
+                <h2>Buckets</h2>
+                <div class="actions">
+                    <input v-model="newBucketName" placeholder="Bucket name" @keyup.enter="createBucket">
+                    <button @click="createBucket">Create Bucket</button>
+                    <button @click="loadBuckets">Refresh</button>
+                </div>
+                <div class="bucket-list">
+                    <table class="bucket-table">
+                        <thead>
+                            <tr>
+                                <th>Bucket Name</th>
+                                <th>Creation Date</th>
+                                <th>Tenant</th>
+                                <th>Physical Path</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="bucket in buckets" :key="bucket.name" class="bucket-item">
+                                <td class="bucket-name" @click="selectBucket(bucket.name)">
+                                    {{ bucket.name }}
+                                </td>
+                                <td class="bucket-date">{{ formatDate(bucket.creationDate) }}</td>
+                                <td class="bucket-tenant">
+                                    <span :title="bucket.tenantDesc">{{ bucket.tenant || '-' }}</span>
+                                </td>
+                                <td class="bucket-path" :title="bucket.path">
+                                    <code>{{ bucket.path || '-' }}</code>
+                                </td>
+                                <td class="bucket-actions">
+                                    <button @click="deleteBucket(bucket.name)" class="delete-btn">Delete</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Objects Tab -->
+            <div v-if="activeTab === 'objects'" class="tab-content">
+                <h2>Objects in {{ selectedBucket || 'Select a bucket' }}</h2>
+                <div v-if="selectedBucket" class="actions">
+                    <input type="file" ref="fileInput" @change="handleFileSelect">
+                    <input v-model="uploadKey" placeholder="Object key (optional)">
+                    <button @click="uploadObject">Upload</button>
+                    <button @click="loadObjects">Refresh</button>
+                </div>
+                <div class="object-navigation" v-if="selectedBucket">
+                    <input v-model="prefix" placeholder="Prefix filter" @keyup.enter="loadObjects">
+                    <button @click="loadObjects">Filter</button>
+                </div>
+                <div class="object-list" v-if="selectedBucket">
+                    <div v-for="prefix in commonPrefixes" :key="prefix" class="prefix-item">
+                        <span class="prefix-name" @click="navigateToPrefix(prefix)">📁 {{ prefix }}</span>
+                    </div>
+                    <div v-for="object in objects" :key="object.key" class="object-item">
+                        <span class="object-name">{{ object.key }}</span>
+                        <span class="object-size">{{ formatSize(object.size) }}</span>
+                        <span class="object-date">{{ formatDate(object.lastModified) }}</span>
+                        <button @click="deleteObject(object.key)" class="delete-btn">Delete</button>
+                        <button @click="downloadObject(object.key)" class="download-btn">Download</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Presigned URLs Tab -->
+            <div v-if="activeTab === 'presigned'" class="tab-content">
+                <h2>Generate Presigned URL</h2>
+                
+                <!-- Auth Configuration Section -->
+                <div class="auth-config" v-if="authConfig.authMode === 'sigv4'">
+                    <h3>Authentication Configuration</h3>
+                    <div class="auth-info">
+                        <p><strong>Auth Mode:</strong> {{ authConfig.authMode }}</p>
+                        <p><strong>Region:</strong> {{ authConfig.region }}</p>
+                        <p v-if="authConfig.accessKeyId"><strong>Access Key ID:</strong> {{ authConfig.accessKeyId }}</p>
+                    </div>
+                    
+                    <div class="credentials-form">
+                        <div class="form-group">
+                            <label>Access Key ID:</label>
+                            <input v-model="credentials.accessKeyId" placeholder="Leave empty to use server default">
+                        </div>
+                        <div class="form-group">
+                            <label>Secret Access Key:</label>
+                            <input v-model="credentials.secretAccessKey" type="password" placeholder="Leave empty to use server default">
+                        </div>
+                        <div class="form-note">
+                            <small>Note: Credentials are only used for generating presigned URLs and are not stored.</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="presigned-form">
+                    <div class="form-group">
+                        <label>Bucket:</label>
+                        <select v-model="presignedBucket">
+                            <option v-for="bucket in buckets" :key="bucket.name" :value="bucket.name">
+                                {{ bucket.name }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Object Key:</label>
+                        <input v-model="presignedKey" placeholder="path/to/object">
+                    </div>
+                    <div class="form-group">
+                        <label>Operation:</label>
+                        <select v-model="presignedOperation">
+                            <option value="GET">GET (Download)</option>
+                            <option value="PUT">PUT (Upload)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Expires in (seconds):</label>
+                        <input v-model.number="presignedExpires" type="number" min="60" max="604800">
+                    </div>
+                    
+                    <!-- Additional Headers for PUT requests -->
+                    <div v-if="presignedOperation === 'PUT'" class="form-group">
+                        <label>Content Type (optional):</label>
+                        <input v-model="presignedContentType" placeholder="e.g., image/jpeg">
+                    </div>
+                    
+                    <button @click="generatePresignedURL" :disabled="!canGeneratePresignedURL">Generate URL</button>
+                </div>
+                <div v-if="generatedURL" class="generated-url">
+                    <h3>Generated URL:</h3>
+                    <textarea readonly :value="generatedURL"></textarea>
+                    <button @click="copyToClipboard(generatedURL)">Copy to Clipboard</button>
+                </div>
+            </div>
+
+            <!-- Tenants Tab -->
+            <div v-if="activeTab === 'tenants'" class="tab-content">
+                <h2>Tenant Mappings</h2>
+                <button @click="loadTenants">Refresh</button>
+                <div class="tenant-list">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Access Key</th>
+                                <th>Root Directory</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="tenant in tenants" :key="tenant.accessKey">
+                                <td>{{ tenant.accessKey }}</td>
+                                <td>{{ tenant.rootDir }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- API Logs Tab -->
+            <div v-if="activeTab === 'logs'" class="tab-content">
+                <h2>API Logs</h2>
+                
+                <!-- Log Filters -->
+                <div class="log-filters">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>Level:</label>
+                            <select v-model="logFilters.level" @change="loadLogs">
+                                <option value="">All</option>
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARN">WARN</option>
+                                <option value="ERROR">ERROR</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>Operation:</label>
+                            <select v-model="logFilters.operation" @change="loadLogs">
+                                <option value="">All</option>
+                                <option v-for="op in availableOperations" :key="op" :value="op">{{ op }}</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>Search:</label>
+                            <input type="text" v-model="logFilters.searchText" @input="loadLogs" placeholder="Search in logs...">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>Limit:</label>
+                            <select v-model.number="logLimit" @change="loadLogs">
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                                <option value="500">500</option>
+                                <option value="1000">1000</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>Start Time:</label>
+                            <input type="datetime-local" v-model="logFilters.startTime" @change="loadLogs">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>End Time:</label>
+                            <input type="datetime-local" v-model="logFilters.endTime" @change="loadLogs">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="actions">
+                    <button @click="loadLogs" class="btn-primary">Refresh</button>
+                    <button @click="clearLogFilters" class="btn-secondary">Clear Filters</button>
+                    <button @click="exportLogs" class="btn-secondary">Export JSON</button>
+                    <label class="auto-refresh-label">
+                        <input type="checkbox" v-model="autoRefreshLogs" @change="toggleAutoRefresh">
+                        Auto-refresh
+                    </label>
+                    <span class="log-count">Showing {{ logs.length }} logs</span>
+                </div>
+                
+                <div class="log-list">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th>Level</th>
+                                <th>Timestamp</th>
+                                <th>Operation</th>
+                                <th>Method</th>
+                                <th>Path</th>
+                                <th>Bucket/Key</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Client IP</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="log in logs" :key="log.id || (log.timestamp + log.path)" :class="getLogClass(log)">
+                                <td>
+                                    <span class="badge" :class="getLogLevelClass(log.level)">{{ log.level || 'INFO' }}</span>
+                                </td>
+                                <td class="timestamp">{{ formatDate(log.timestamp) }}</td>
+                                <td>{{ log.operation || '-' }}</td>
+                                <td>{{ log.method || '-' }}</td>
+                                <td class="path" :title="log.path">{{ log.path || '-' }}</td>
+                                <td>
+                                    <span v-if="log.bucket || log.key">
+                                        {{ log.bucket || '-' }}<span v-if="log.key">/{{ log.key }}</span>
+                                    </span>
+                                    <span v-else>-</span>
+                                </td>
+                                <td>
+                                    <span v-if="log.statusCode" :class="'status-' + Math.floor(log.statusCode/100) + 'xx'">
+                                        {{ log.statusCode }}
+                                    </span>
+                                    <span v-else>-</span>
+                                </td>
+                                <td>{{ log.duration ? formatDuration(log.duration) : '-' }}</td>
+                                <td>{{ log.clientIP || '-' }}</td>
+                                <td>
+                                    <button v-if="log.error || log.message || log.requestBody || log.responseBody" 
+                                            @click="showLogDetails(log)" 
+                                            class="btn-small">
+                                        View
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="logs.length === 0" class="no-logs">
+                        No logs found matching the current filters.
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Toast notifications -->
+        <div v-if="toast.show" class="toast" :class="toast.type">
+            {{ toast.message }}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
