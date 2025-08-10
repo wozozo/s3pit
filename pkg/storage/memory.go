@@ -1,6 +1,7 @@
 package storage
 
 import (
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"bytes"
 	"fmt"
 	"io"
@@ -308,18 +309,18 @@ func (m *MemoryStorage) UploadPart(bucket, key, uploadId string, partNumber int,
 
 	upload, exists := m.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return "", fmt.Errorf("upload not found")
+		return "", storageerrors.ErrUploadNotFound
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
-		return "", fmt.Errorf("upload mismatch")
+		return "", storageerrors.ErrUploadMismatch
 	}
 
 	// Read the data from the reader
 	data := make([]byte, size)
 	_, err := io.ReadFull(reader, data)
 	if err != nil {
-		return "", fmt.Errorf("failed to read part data: %w", err)
+		return "", storageerrors.WrapStorageError("read part data", err)
 	}
 
 	etag := CalculateETag(data)
@@ -341,11 +342,11 @@ func (m *MemoryStorage) CompleteMultipartUpload(bucket, key, uploadId string, pa
 
 	upload, exists := m.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return "", fmt.Errorf("upload not found")
+		return "", storageerrors.ErrUploadNotFound
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
-		return "", fmt.Errorf("upload mismatch")
+		return "", storageerrors.ErrUploadMismatch
 	}
 
 	uploadParts, _ := m.multipartMgr.GetParts(uploadId)
@@ -355,7 +356,7 @@ func (m *MemoryStorage) CompleteMultipartUpload(bucket, key, uploadId string, pa
 	for _, part := range parts {
 		partData, exists := uploadParts[part.PartNumber]
 		if !exists {
-			return "", fmt.Errorf("part %d not found", part.PartNumber)
+			return "", storageerrors.WrapMultipartError(fmt.Sprintf("part %d", part.PartNumber), storageerrors.ErrPartNotFound)
 		}
 		finalData = append(finalData, partData...)
 	}
@@ -388,11 +389,11 @@ func (m *MemoryStorage) AbortMultipartUpload(bucket, key, uploadId string) error
 
 	upload, exists := m.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return fmt.Errorf("upload not found")
+		return storageerrors.ErrUploadNotFound
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
-		return fmt.Errorf("upload mismatch")
+		return storageerrors.ErrUploadMismatch
 	}
 
 	return m.multipartMgr.DeleteUpload(uploadId)
@@ -409,11 +410,11 @@ func (m *MemoryStorage) ListParts(bucket, key, uploadId string) ([]PartInfo, err
 
 	upload, exists := m.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return nil, fmt.Errorf("upload not found")
+		return nil, storageerrors.ErrUploadNotFound
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
-		return nil, fmt.Errorf("upload mismatch")
+		return nil, storageerrors.ErrUploadMismatch
 	}
 
 	return m.multipartMgr.ListParts(uploadId)

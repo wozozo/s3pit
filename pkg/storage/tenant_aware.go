@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"github.com/wozozo/s3pit/pkg/tenant"
 )
 
@@ -69,7 +70,7 @@ func (t *TenantAwareStorage) GetStorageForTenant(tenantID string) (Storage, erro
 	} else {
 		storage, err = NewFileSystemStorage(dir)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create storage for tenant %s: %w", tenantID, err)
+			return nil, storageerrors.WrapStorageError(fmt.Sprintf("create storage for tenant %s", tenantID), err)
 		}
 	}
 

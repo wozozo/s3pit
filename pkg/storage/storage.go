@@ -1,16 +1,18 @@
 package storage
 
 import (
-	"errors"
 	"io"
 	"time"
+	
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
+// Re-export common errors for backward compatibility
 var (
-	ErrBucketNotFound = errors.New("bucket not found")
-	ErrBucketNotEmpty = errors.New("bucket not empty")
-	ErrObjectNotFound = errors.New("object not found")
-	ErrBucketExists   = errors.New("bucket already exists")
+	ErrBucketNotFound = storageerrors.ErrBucketNotFound
+	ErrBucketNotEmpty = storageerrors.ErrBucketNotEmpty
+	ErrObjectNotFound = storageerrors.ErrObjectNotFound
+	ErrBucketExists   = storageerrors.ErrBucketExists
 )
 
 type Storage interface {

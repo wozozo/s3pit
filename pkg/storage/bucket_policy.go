@@ -1,6 +1,7 @@
 package storage
 
 import (
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -137,7 +138,7 @@ func DefaultPublicReadPolicy(bucket string) *BucketPolicy {
 func ParseBucketPolicy(data []byte) (*BucketPolicy, error) {
 	var policy BucketPolicy
 	if err := json.Unmarshal(data, &policy); err != nil {
-		return nil, fmt.Errorf("failed to parse bucket policy: %w", err)
+		return nil, storageerrors.WrapStorageError("parse bucket policy", err)
 	}
 	return &policy, nil
 }

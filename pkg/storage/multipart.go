@@ -1,6 +1,7 @@
 package storage
 
 import (
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"fmt"
 	"sync"
 	"time"
@@ -56,7 +57,7 @@ func (m *MultipartManager) StorePart(uploadId string, partNumber int, data []byt
 	
 	upload, exists := m.uploads[uploadId]
 	if !exists {
-		return fmt.Errorf("upload not found: %s", uploadId)
+		return storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
 	
 	// Store part data
@@ -91,7 +92,7 @@ func (m *MultipartManager) ListParts(uploadId string) ([]PartInfo, error) {
 	
 	upload, exists := m.uploads[uploadId]
 	if !exists {
-		return nil, fmt.Errorf("upload not found: %s", uploadId)
+		return nil, storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
 	
 	parts := make([]PartInfo, 0, len(upload.Parts))

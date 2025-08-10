@@ -5,7 +5,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+	
+	autherrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
 type Handler interface {
@@ -39,7 +40,7 @@ func NewHandler(mode string, accessKeyID, secretAccessKey string) (Handler, erro
 	case ModeSigV4:
 		// valid mode
 	default:
-		return nil, fmt.Errorf("invalid auth mode: %s (only sigv4 is supported)", mode)
+		return nil, autherrors.WrapAuthError("mode validation", fmt.Errorf("%s: %w", mode, autherrors.ErrInvalidAuthMode))
 	}
 
 	return &handler{
@@ -55,7 +56,7 @@ func (h *handler) Authenticate(r *http.Request) (string, error) {
 		return h.authenticateSigV4(r)
 
 	default:
-		return "", errors.New("authentication mode not configured")
+		return "", autherrors.ErrAuthModeNotConfigured
 	}
 }
 
@@ -72,16 +73,16 @@ func (h *handler) authenticateSigV4(r *http.Request) (string, error) {
 	// Standard header authentication
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return "", errors.New("missing authorization header")
+		return "", autherrors.ErrMissingAuthHeader
 	}
 
 	if !strings.HasPrefix(authHeader, "AWS4-HMAC-SHA256") {
-		return "", errors.New("only AWS Signature Version 4 is supported")
+		return "", autherrors.ErrUnsupportedAuthVersion
 	}
 
 	parts := strings.Split(authHeader, " ")
 	if len(parts) < 2 {
-		return "", errors.New("invalid authorization header format")
+		return "", autherrors.ErrInvalidAuthFormat
 	}
 
 	var accessKey, signature, signedHeaders string
@@ -104,11 +105,11 @@ func (h *handler) authenticateSigV4(r *http.Request) (string, error) {
 	}
 
 	if accessKey == "" || signature == "" || signedHeaders == "" || len(credentialScope) == 0 {
-		return "", errors.New("incomplete authorization header")
+		return "", autherrors.ErrIncompleteAuthHeader
 	}
 
 	if accessKey != h.accessKeyID {
-		return "", errors.New("invalid access key")
+		return "", autherrors.ErrInvalidAccessKey
 	}
 
 	// Verify the signature
@@ -117,7 +118,7 @@ func (h *handler) authenticateSigV4(r *http.Request) (string, error) {
 	calculatedSig := h.calculateSignature(credentialScope[0], credentialScope[1], stringToSign)
 
 	if calculatedSig != signature {
-		return "", errors.New("signature mismatch")
+		return "", autherrors.ErrSignatureMismatch
 	}
 
 	return accessKey, nil
@@ -132,22 +133,22 @@ func (h *handler) authenticateSigV4Query(r *http.Request) (string, error) {
 	// Extract required parameters
 	algorithm := query.Get("X-Amz-Algorithm")
 	if algorithm != "AWS4-HMAC-SHA256" {
-		return "", errors.New("invalid algorithm")
+		return "", autherrors.ErrInvalidAlgorithm
 	}
 
 	credential := query.Get("X-Amz-Credential")
 	if credential == "" {
-		return "", errors.New("missing credential")
+		return "", autherrors.ErrMissingCredential
 	}
 
 	credParts := strings.Split(credential, "/")
 	if len(credParts) < 5 {
-		return "", errors.New("invalid credential format")
+		return "", autherrors.ErrInvalidCredential
 	}
 
 	accessKey := credParts[0]
 	if accessKey != h.accessKeyID {
-		return "", errors.New("invalid access key")
+		return "", autherrors.ErrInvalidAccessKey
 	}
 
 	// Check expiration
@@ -157,16 +158,16 @@ func (h *handler) authenticateSigV4Query(r *http.Request) (string, error) {
 		// Parse date and check if URL has expired
 		t, err := time.Parse("20060102T150405Z", date)
 		if err != nil {
-			return "", errors.New("invalid date format")
+			return "", autherrors.ErrInvalidDateFormat
 		}
 
 		var expiresInt int
 		if _, err := fmt.Sscanf(expires, "%d", &expiresInt); err != nil {
-			return "", errors.New("invalid expires format")
+			return "", autherrors.ErrInvalidExpiresFormat
 		}
 
 		if time.Now().After(t.Add(time.Duration(expiresInt) * time.Second)) {
-			return "", errors.New("presigned URL has expired")
+			return "", autherrors.ErrPresignedURLExpired
 		}
 	}
 
@@ -175,7 +176,7 @@ func (h *handler) authenticateSigV4Query(r *http.Request) (string, error) {
 	signature := query.Get("X-Amz-Signature")
 
 	if signedHeaders == "" || signature == "" {
-		return "", errors.New("missing signed headers or signature")
+		return "", autherrors.ErrMissingSignedHeaders
 	}
 
 	// Build canonical request for query auth
@@ -185,7 +186,7 @@ func (h *handler) authenticateSigV4Query(r *http.Request) (string, error) {
 	calculatedSig := h.calculateSignature(credentialScope[0], credentialScope[1], stringToSign)
 
 	if calculatedSig != signature {
-		return "", errors.New("signature mismatch")
+		return "", autherrors.ErrSignatureMismatch
 	}
 
 	return accessKey, nil

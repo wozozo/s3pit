@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
 type FileSystemStorage struct {
@@ -21,11 +23,11 @@ type FileSystemStorage struct {
 func NewFileSystemStorage(baseDir string) (*FileSystemStorage, error) {
 	absPath, err := filepath.Abs(baseDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve base directory: %w", err)
+		return nil, storageerrors.WrapFileSystemError(baseDir, "resolve directory", err)
 	}
 
 	if err := os.MkdirAll(absPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create base directory: %w", err)
+		return nil, storageerrors.WrapFileSystemError(absPath, "create directory", err)
 	}
 
 	return &FileSystemStorage{
@@ -72,7 +74,7 @@ func (fs *FileSystemStorage) CreateBucket(bucket string) (bool, error) {
 	}
 
 	if err := os.MkdirAll(bucketPath, 0755); err != nil {
-		return false, fmt.Errorf("failed to create bucket directory: %w", err)
+		return false, storageerrors.WrapFileSystemError(bucketPath, "create directory", err)
 	}
 
 	metaPath := filepath.Join(bucketPath, ".s3pit_bucket_meta.json")
@@ -102,13 +104,13 @@ func (fs *FileSystemStorage) PutObject(bucket, key string, reader io.Reader, siz
 	objectDir := filepath.Dir(objectPath)
 
 	if err := os.MkdirAll(objectDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create object directory: %w", err)
+		return "", storageerrors.WrapFileSystemError(objectDir, "create directory", err)
 	}
 
 	// Use a temporary file for atomic writes
 	tempFile, err := os.CreateTemp(objectDir, ".upload_*")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temp file: %w", err)
+		return "", storageerrors.WrapFileSystemError(objectDir, "create temp file", err)
 	}
 	tempPath := tempFile.Name()
 
@@ -123,7 +125,7 @@ func (fs *FileSystemStorage) PutObject(bucket, key string, reader io.Reader, siz
 	// Read all data to calculate ETag
 	data, err := io.ReadAll(reader)
 	if err != nil {
-		return "", fmt.Errorf("failed to read object data: %w", err)
+		return "", storageerrors.WrapStorageError("read object data", err)
 	}
 
 	// Calculate ETag using helper
@@ -131,7 +133,7 @@ func (fs *FileSystemStorage) PutObject(bucket, key string, reader io.Reader, siz
 
 	// Write data to temp file
 	if _, err := tempFile.Write(data); err != nil {
-		return "", fmt.Errorf("failed to write object data: %w", err)
+		return "", storageerrors.WrapFileSystemError(tempPath, "write file", err)
 	}
 
 	if err := tempFile.Close(); err != nil {
@@ -141,7 +143,7 @@ func (fs *FileSystemStorage) PutObject(bucket, key string, reader io.Reader, siz
 
 	// Atomic rename
 	if err := os.Rename(tempPath, objectPath); err != nil {
-		return "", fmt.Errorf("failed to move object to final location: %w", err)
+		return "", storageerrors.WrapFileSystemError(objectPath, "move file", err)
 	}
 
 	// Save metadata
@@ -542,11 +544,11 @@ func (fs *FileSystemStorage) InitiateMultipartUpload(bucket, key string) (string
 func (fs *FileSystemStorage) UploadPart(bucket, key, uploadId string, partNumber int, reader io.Reader, size int64) (string, error) {
 	upload, exists := fs.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return "", fmt.Errorf("upload not found: %s", uploadId)
+		return "", storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
-		return "", fmt.Errorf("upload mismatch")
+		return "", storageerrors.ErrUploadMismatch
 	}
 
 	return fs.multipartMgr.StorePart(uploadId, partNumber, reader, size)
@@ -556,11 +558,11 @@ func (fs *FileSystemStorage) UploadPart(bucket, key, uploadId string, partNumber
 func (fs *FileSystemStorage) CompleteMultipartUpload(bucket, key, uploadId string, parts []CompletedPart) (string, error) {
 	upload, exists := fs.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return "", fmt.Errorf("upload not found: %s", uploadId)
+		return "", storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
-		return "", fmt.Errorf("upload mismatch")
+		return "", storageerrors.ErrUploadMismatch
 	}
 
 	// Combine all parts
@@ -580,12 +582,12 @@ func (fs *FileSystemStorage) CompleteMultipartUpload(bucket, key, uploadId strin
 		partPath := fs.multipartMgr.GetPartPath(uploadId, part.PartNumber)
 		partFile, err := os.Open(partPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to open part %d: %w", part.PartNumber, err)
+			return "", storageerrors.WrapMultipartError(fmt.Sprintf("part %d", part.PartNumber), err)
 		}
 
 		if _, err := io.Copy(outFile, partFile); err != nil {
 			partFile.Close()
-			return "", fmt.Errorf("failed to copy part %d: %w", part.PartNumber, err)
+			return "", storageerrors.WrapMultipartError(fmt.Sprintf("part %d copy", part.PartNumber), err)
 		}
 		partFile.Close()
 	}
@@ -625,11 +627,11 @@ func (fs *FileSystemStorage) CompleteMultipartUpload(bucket, key, uploadId strin
 func (fs *FileSystemStorage) AbortMultipartUpload(bucket, key, uploadId string) error {
 	upload, exists := fs.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return fmt.Errorf("upload not found: %s", uploadId)
+		return storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
-		return fmt.Errorf("upload mismatch")
+		return storageerrors.ErrUploadMismatch
 	}
 
 	return fs.multipartMgr.DeleteUpload(uploadId)
@@ -639,11 +641,11 @@ func (fs *FileSystemStorage) AbortMultipartUpload(bucket, key, uploadId string) 
 func (fs *FileSystemStorage) ListParts(bucket, key, uploadId string) ([]PartInfo, error) {
 	upload, exists := fs.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return nil, fmt.Errorf("upload not found: %s", uploadId)
+		return nil, storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
-		return nil, fmt.Errorf("upload mismatch")
+		return nil, storageerrors.ErrUploadMismatch
 	}
 
 	return fs.multipartMgr.ListParts(uploadId)

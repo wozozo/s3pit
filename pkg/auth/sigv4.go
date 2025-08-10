@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+	
+	autherrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
 // SigV4Signer provides methods for generating AWS Signature Version 4 signatures
@@ -173,7 +175,7 @@ func (s *SigV4Signer) ValidatePresignedURL(rawURL string) error {
 
 	// Check algorithm
 	if query.Get("X-Amz-Algorithm") != "AWS4-HMAC-SHA256" {
-		return fmt.Errorf("invalid algorithm")
+		return autherrors.ErrInvalidAlgorithm
 	}
 
 	// Check expiration
@@ -182,16 +184,16 @@ func (s *SigV4Signer) ValidatePresignedURL(rawURL string) error {
 	if amzDate != "" && expires != "" {
 		t, err := time.Parse("20060102T150405Z", amzDate)
 		if err != nil {
-			return fmt.Errorf("invalid date format")
+			return autherrors.ErrInvalidDateFormat
 		}
 
 		var expiresInt int
 		if _, err := fmt.Sscanf(expires, "%d", &expiresInt); err != nil {
-			return fmt.Errorf("invalid expires format")
+			return autherrors.ErrInvalidExpiresFormat
 		}
 
 		if time.Now().After(t.Add(time.Duration(expiresInt) * time.Second)) {
-			return fmt.Errorf("presigned URL has expired")
+			return autherrors.ErrPresignedURLExpired
 		}
 	}
 
@@ -208,7 +210,7 @@ func (s *SigV4Signer) ValidatePresignedURL(rawURL string) error {
 	credential := query.Get("X-Amz-Credential")
 	credParts := strings.Split(credential, "/")
 	if len(credParts) < 5 {
-		return fmt.Errorf("invalid credential format")
+		return autherrors.ErrInvalidCredential
 	}
 
 	dateStamp := credParts[1]
@@ -236,7 +238,7 @@ func (s *SigV4Signer) ValidatePresignedURL(rawURL string) error {
 	expectedSignature := s.calculateSignature(dateStamp, stringToSign)
 
 	if expectedSignature != providedSignature {
-		return fmt.Errorf("signature mismatch")
+		return autherrors.ErrSignatureMismatch
 	}
 
 	return nil

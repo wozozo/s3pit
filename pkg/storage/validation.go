@@ -6,39 +6,41 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
 // ValidateBucketName validates that a bucket name is not empty and follows S3 naming rules
 func ValidateBucketName(bucket string) error {
 	if bucket == "" {
-		return fmt.Errorf("bucket name cannot be empty")
+		return storageerrors.ErrBucketNameEmpty
 	}
 	
 	// S3 bucket naming rules
 	if len(bucket) < 3 || len(bucket) > 63 {
-		return fmt.Errorf("bucket name must be between 3 and 63 characters")
+		return storageerrors.ErrBucketNameTooLong
 	}
 	
 	// Must start and end with lowercase letter or number
 	if !isAlphanumeric(bucket[0]) || !isAlphanumeric(bucket[len(bucket)-1]) {
-		return fmt.Errorf("bucket name must start and end with a lowercase letter or number")
+		return storageerrors.ErrBucketNameInvalidChar
 	}
 	
 	// Check for invalid characters and consecutive dots/hyphens
 	for i, ch := range bucket {
 		if !isValidBucketChar(ch) {
-			return fmt.Errorf("bucket name contains invalid character: %c", ch)
+			return storageerrors.ErrBucketNameInvalidChar
 		}
 		
 		// No consecutive dots or hyphens
 		if i > 0 && (ch == '.' || ch == '-') && bucket[i-1] == byte(ch) {
-			return fmt.Errorf("bucket name cannot contain consecutive dots or hyphens")
+			return storageerrors.ErrBucketNameInvalidChar
 		}
 	}
 	
 	// Cannot be formatted as IP address
 	if looksLikeIPAddress(bucket) {
-		return fmt.Errorf("bucket name cannot be formatted as an IP address")
+		return storageerrors.ErrBucketNameInvalidFormat
 	}
 	
 	return nil
@@ -47,17 +49,17 @@ func ValidateBucketName(bucket string) error {
 // ValidateObjectKey validates that an object key is valid
 func ValidateObjectKey(key string) error {
 	if key == "" {
-		return fmt.Errorf("object key cannot be empty")
+		return storageerrors.ErrObjectKeyEmpty
 	}
 	
 	// Check for null bytes
 	if strings.Contains(key, "\x00") {
-		return fmt.Errorf("object key cannot contain null bytes")
+		return storageerrors.ErrObjectKeyNullBytes
 	}
 	
 	// Key length limit (S3 limit is 1024 bytes)
 	if len(key) > 1024 {
-		return fmt.Errorf("object key is too long (max 1024 bytes)")
+		return storageerrors.ErrObjectKeyTooLong
 	}
 	
 	return nil
@@ -79,7 +81,7 @@ func CalculateETagFromReader(reader io.Reader) (string, int64, []byte, error) {
 	
 	written, err := io.Copy(hash, teeReader)
 	if err != nil {
-		return "", 0, nil, fmt.Errorf("failed to calculate hash: %w", err)
+		return "", 0, nil, storageerrors.WrapStorageError("calculate hash", err)
 	}
 	
 	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))

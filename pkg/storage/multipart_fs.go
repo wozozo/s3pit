@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
 // FileSystemMultipartManager handles multipart uploads with filesystem storage
@@ -40,7 +42,7 @@ func (m *FileSystemMultipartManager) InitiateUpload(bucket, key string) (string,
 	tempDir := filepath.Join(m.baseDir, ".s3pit_uploads", uploadId)
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		m.uploads.Delete(uploadId)
-		return "", fmt.Errorf("failed to create upload directory: %w", err)
+		return "", storageerrors.WrapFileSystemError(tempDir, "create directory", err)
 	}
 	
 	return uploadId, nil
@@ -59,7 +61,7 @@ func (m *FileSystemMultipartManager) GetUpload(uploadId string) (*MultipartUploa
 func (m *FileSystemMultipartManager) StorePart(uploadId string, partNumber int, reader io.Reader, size int64) (string, error) {
 	upload, exists := m.GetUpload(uploadId)
 	if !exists {
-		return "", fmt.Errorf("upload not found: %s", uploadId)
+		return "", storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
 	
 	// Save part to temporary file
@@ -108,7 +110,7 @@ func (m *FileSystemMultipartManager) GetPartPath(uploadId string, partNumber int
 func (m *FileSystemMultipartManager) ListParts(uploadId string) ([]PartInfo, error) {
 	upload, exists := m.GetUpload(uploadId)
 	if !exists {
-		return nil, fmt.Errorf("upload not found: %s", uploadId)
+		return nil, storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
 	
 	parts := make([]PartInfo, 0, len(upload.Parts))

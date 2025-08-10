@@ -5,7 +5,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	autherrors "github.com/wozozo/s3pit/pkg/errors"
 	"github.com/wozozo/s3pit/pkg/tenant"
 )
 
@@ -31,7 +31,7 @@ func NewMultiTenantHandler(mode string, tenantManager *tenant.Manager) (Handler,
 	case ModeSigV4:
 		// valid mode
 	default:
-		return nil, fmt.Errorf("invalid auth mode: %s (only sigv4 is supported)", mode)
+		return nil, autherrors.WrapAuthError("mode validation", fmt.Errorf("%s: %w", mode, autherrors.ErrInvalidAuthMode))
 	}
 
 	return &MultiTenantHandler{
@@ -46,7 +46,7 @@ func (h *MultiTenantHandler) Authenticate(r *http.Request) (string, error) {
 		return h.authenticateSigV4(r)
 
 	default:
-		return "", errors.New("authentication mode not configured")
+		return "", autherrors.ErrAuthModeNotConfigured
 	}
 }
 
@@ -88,7 +88,7 @@ func (h *MultiTenantHandler) authenticateSigV4(r *http.Request) (string, error) 
 	// Extract access key
 	accessKey := h.extractAccessKey(r)
 	if accessKey == "" {
-		return "", errors.New("missing access key in request")
+		return "", autherrors.ErrMissingAccessKey
 	}
 
 	// Get secret key from tenant manager
@@ -97,10 +97,10 @@ func (h *MultiTenantHandler) authenticateSigV4(r *http.Request) (string, error) 
 		if t, exists := h.tenantManager.GetTenant(accessKey); exists {
 			secretKey = t.SecretAccessKey
 		} else {
-			return "", fmt.Errorf("access key not found: %s", accessKey)
+			return "", autherrors.WrapCredentialError(accessKey, autherrors.ErrAccessKeyNotFound)
 		}
 	} else {
-		return "", fmt.Errorf("no tenant manager configured")
+		return "", autherrors.ErrNoTenantManager
 	}
 
 	// Check for query string authentication (presigned URL)
@@ -111,16 +111,16 @@ func (h *MultiTenantHandler) authenticateSigV4(r *http.Request) (string, error) 
 	// Standard header authentication
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		return "", errors.New("missing authorization header")
+		return "", autherrors.ErrMissingAuthHeader
 	}
 
 	if !strings.HasPrefix(authHeader, "AWS4-HMAC-SHA256") {
-		return "", errors.New("only AWS Signature Version 4 is supported")
+		return "", autherrors.ErrUnsupportedAuthVersion
 	}
 
 	parts := strings.Split(authHeader, " ")
 	if len(parts) < 2 {
-		return "", errors.New("invalid authorization header format")
+		return "", autherrors.ErrInvalidAuthFormat
 	}
 
 	var signature, signedHeaders string
@@ -144,18 +144,18 @@ func (h *MultiTenantHandler) authenticateSigV4(r *http.Request) (string, error) 
 	}
 
 	if len(credentialScope) < 4 || signature == "" || signedHeaders == "" {
-		return "", errors.New("invalid authorization header: missing required components")
+		return "", autherrors.ErrIncompleteAuthHeader
 	}
 
 	// Calculate expected signature
 	expectedSig, err := h.calculateSignature(r, accessKey, secretKey, credentialScope, signedHeaders)
 	if err != nil {
-		return "", fmt.Errorf("failed to calculate signature: %w", err)
+		return "", autherrors.WrapSignatureError(err)
 	}
 
 	// Compare signatures
 	if !hmac.Equal([]byte(signature), []byte(expectedSig)) {
-		return "", errors.New("signature mismatch")
+		return "", autherrors.ErrSignatureMismatch
 	}
 
 	return accessKey, nil
@@ -167,32 +167,32 @@ func (h *MultiTenantHandler) authenticateSigV4Query(r *http.Request, accessKey, 
 	// Extract required parameters
 	algorithm := query.Get("X-Amz-Algorithm")
 	if algorithm != "AWS4-HMAC-SHA256" {
-		return "", errors.New("invalid algorithm")
+		return "", autherrors.ErrInvalidAlgorithm
 	}
 
 	credential := query.Get("X-Amz-Credential")
 	if credential == "" {
-		return "", errors.New("missing credential")
+		return "", autherrors.ErrMissingCredential
 	}
 
 	credParts := strings.Split(credential, "/")
 	if len(credParts) < 5 {
-		return "", errors.New("invalid credential format")
+		return "", autherrors.ErrInvalidCredential
 	}
 
 	date := query.Get("X-Amz-Date")
 	if date == "" {
-		return "", errors.New("missing date")
+		return "", autherrors.ErrMissingDate
 	}
 
 	signedHeaders := query.Get("X-Amz-SignedHeaders")
 	if signedHeaders == "" {
-		return "", errors.New("missing signed headers")
+		return "", autherrors.ErrMissingSignedHeaders
 	}
 
 	signature := query.Get("X-Amz-Signature")
 	if signature == "" {
-		return "", errors.New("missing signature")
+		return "", autherrors.ErrMissingSignature
 	}
 
 	expires := query.Get("X-Amz-Expires")
@@ -200,13 +200,13 @@ func (h *MultiTenantHandler) authenticateSigV4Query(r *http.Request, accessKey, 
 		// Check if URL has expired
 		signTime, err := time.Parse("20060102T150405Z", date)
 		if err != nil {
-			return "", fmt.Errorf("invalid date format: %w", err)
+			return "", autherrors.WrapAuthError("date parsing", autherrors.ErrInvalidDateFormat)
 		}
 
 		expiresInt := 0
 		_, _ = fmt.Sscanf(expires, "%d", &expiresInt)
 		if time.Since(signTime) > time.Duration(expiresInt)*time.Second {
-			return "", errors.New("presigned URL has expired")
+			return "", autherrors.ErrPresignedURLExpired
 		}
 	}
 
@@ -214,12 +214,12 @@ func (h *MultiTenantHandler) authenticateSigV4Query(r *http.Request, accessKey, 
 	credentialScope := credParts[1:5] // date/region/service/aws4_request
 	expectedSig, err := h.calculatePresignedSignature(r, accessKey, secretKey, credentialScope, signedHeaders)
 	if err != nil {
-		return "", fmt.Errorf("failed to calculate signature: %w", err)
+		return "", autherrors.WrapSignatureError(err)
 	}
 
 	// Compare signatures
 	if !hmac.Equal([]byte(signature), []byte(expectedSig)) {
-		return "", errors.New("signature mismatch")
+		return "", autherrors.ErrSignatureMismatch
 	}
 
 	return accessKey, nil
