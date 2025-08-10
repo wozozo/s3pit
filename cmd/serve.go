@@ -162,12 +162,12 @@ func loadTenantsConfig(filePath string) (*tenant.TenantsConfig, error) {
 // getLocalIPAddresses returns a list of local non-loopback IP addresses
 func getLocalIPAddresses() []string {
 	var ips []string
-	
+
 	interfaces, err := net.InterfaceAddrs()
 	if err != nil {
 		return ips
 	}
-	
+
 	for _, addr := range interfaces {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
@@ -175,7 +175,7 @@ func getLocalIPAddresses() []string {
 			}
 		}
 	}
-	
+
 	return ips
 }
 
@@ -290,14 +290,14 @@ func runServe(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s%sStarting server...%s\n", ColorBold, ColorGreen, ColorReset)
 	// Print server start message with multiple address formats
 	fmt.Printf("%sServer listening on:%s\n", ColorBold, ColorReset)
-	
+
 	// Show localhost address
 	fmt.Printf("  %s• http://localhost:%d%s\n", ColorYellow, serveCfg.Port, ColorReset)
-	
+
 	// Show 0.0.0.0 address
 	if serveCfg.Host == "0.0.0.0" {
 		fmt.Printf("  %s• http://0.0.0.0:%d%s (all interfaces)\n", ColorYellow, serveCfg.Port, ColorReset)
-		
+
 		// Get local IP addresses
 		if localIPs := getLocalIPAddresses(); len(localIPs) > 0 {
 			for _, ip := range localIPs {
@@ -308,15 +308,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 		// Show the configured host
 		fmt.Printf("  %s• http://%s:%d%s\n", ColorYellow, serveCfg.Host, serveCfg.Port, ColorReset)
 	}
-	
+
 	// Show dashboard URLs if enabled
 	if serveCfg.EnableDashboard {
 		fmt.Printf("\n%sDashboard:%s\n", ColorBold, ColorReset)
 		fmt.Printf("  %s• http://localhost:%d/dashboard%s\n", ColorCyan, serveCfg.Port, ColorReset)
-		
+
 		if serveCfg.Host == "0.0.0.0" {
 			fmt.Printf("  %s• http://0.0.0.0:%d/dashboard%s (all interfaces)\n", ColorCyan, serveCfg.Port, ColorReset)
-			
+
 			// Get local IP addresses for dashboard
 			if localIPs := getLocalIPAddresses(); len(localIPs) > 0 {
 				for _, ip := range localIPs {

@@ -242,7 +242,7 @@ func TestPublicBucketWriteRestriction(t *testing.T) {
 		// Check error response - handle both XML formats
 		responseBody := w.Body.String()
 		assert.Contains(t, responseBody, "AccessDenied")
-		assert.Contains(t, responseBody, "Public buckets are read-only")
+		assert.Contains(t, responseBody, "Public buckets require authentication for write operations")
 	})
 
 	t.Run("DELETE request to public bucket without auth is denied", func(t *testing.T) {
@@ -256,7 +256,7 @@ func TestPublicBucketWriteRestriction(t *testing.T) {
 		// Check error response - handle both XML formats
 		responseBody := w.Body.String()
 		assert.Contains(t, responseBody, "AccessDenied")
-		assert.Contains(t, responseBody, "Public buckets are read-only")
+		assert.Contains(t, responseBody, "Public buckets require authentication for write operations")
 	})
 
 	t.Run("POST request to public bucket without auth is denied", func(t *testing.T) {
@@ -268,7 +268,7 @@ func TestPublicBucketWriteRestriction(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, w.Code)
 	})
 
-	t.Run("PUT request to public bucket WITH auth is also denied", func(t *testing.T) {
+	t.Run("PUT request to public bucket WITH auth succeeds", func(t *testing.T) {
 		body := bytes.NewBufferString("new content")
 		req := httptest.NewRequest("PUT", "/public-bucket/new.txt", body)
 
@@ -278,10 +278,8 @@ func TestPublicBucketWriteRestriction(t *testing.T) {
 		w := httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
 
-		// Public buckets should be read-only even with authentication
-		assert.Equal(t, http.StatusForbidden, w.Code)
-		responseBody := w.Body.String()
-		assert.Contains(t, responseBody, "Public buckets are read-only")
+		// Public buckets should allow write with authentication
+		assert.Equal(t, http.StatusOK, w.Code)
 	})
 }
 
@@ -335,6 +333,106 @@ func TestNonPublicBucketAccess(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, "updated content", w.Body.String())
+	})
+}
+
+func TestPresignedURLWithPublicBucket(t *testing.T) {
+	server, _, cleanup := setupTestServerWithPublicBuckets(t)
+	defer cleanup()
+
+	t.Run("PUT request to public bucket with presigned URL succeeds", func(t *testing.T) {
+		// Generate presigned URL parameters for write operation
+		accessKey := "public-tenant"
+		bucket := "public-bucket"
+		key := "presigned-upload.txt"
+		expires := 3600
+
+		// Create base URL for PUT
+		baseURL := fmt.Sprintf("http://localhost:3333/%s/%s", bucket, key)
+		u, err := url.Parse(baseURL)
+		require.NoError(t, err)
+
+		// Add presigned URL parameters
+		now := time.Now().UTC()
+		dateStr := now.Format("20060102T150405Z")
+		shortDateStr := now.Format("20060102")
+		credential := fmt.Sprintf("%s/%s/us-east-1/s3/aws4_request", accessKey, shortDateStr)
+
+		q := u.Query()
+		q.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
+		q.Set("X-Amz-Credential", credential)
+		q.Set("X-Amz-Date", dateStr)
+		q.Set("X-Amz-Expires", fmt.Sprintf("%d", expires))
+		q.Set("X-Amz-SignedHeaders", "host")
+		q.Set("X-Amz-Signature", "test-signature") // Test handler doesn't validate signature
+		u.RawQuery = q.Encode()
+
+		// Make PUT request with presigned URL
+		body := bytes.NewBufferString("content uploaded with presigned URL")
+		req := httptest.NewRequest("PUT", u.String(), body)
+		w := httptest.NewRecorder()
+
+		server.router.ServeHTTP(w, req)
+
+		// Should succeed with presigned URL even for public bucket
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Verify the file was created by reading it without auth (public bucket)
+		req = httptest.NewRequest("GET", fmt.Sprintf("/public-bucket/%s", key), nil)
+		w = httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, "content uploaded with presigned URL", w.Body.String())
+	})
+
+	t.Run("DELETE request to public bucket with presigned URL succeeds", func(t *testing.T) {
+		// First create a file to delete
+		body := bytes.NewBufferString("file to delete")
+		req := httptest.NewRequest("PUT", "/public-bucket/delete-me.txt", body)
+		signRequestSimple(req, "public-tenant")
+		w := httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		// Generate presigned URL for DELETE
+		accessKey := "public-tenant"
+		bucket := "public-bucket"
+		key := "delete-me.txt"
+		expires := 3600
+
+		baseURL := fmt.Sprintf("http://localhost:3333/%s/%s", bucket, key)
+		u, err := url.Parse(baseURL)
+		require.NoError(t, err)
+
+		now := time.Now().UTC()
+		dateStr := now.Format("20060102T150405Z")
+		shortDateStr := now.Format("20060102")
+		credential := fmt.Sprintf("%s/%s/us-east-1/s3/aws4_request", accessKey, shortDateStr)
+
+		q := u.Query()
+		q.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
+		q.Set("X-Amz-Credential", credential)
+		q.Set("X-Amz-Date", dateStr)
+		q.Set("X-Amz-Expires", fmt.Sprintf("%d", expires))
+		q.Set("X-Amz-SignedHeaders", "host")
+		q.Set("X-Amz-Signature", "test-signature")
+		u.RawQuery = q.Encode()
+
+		// Make DELETE request with presigned URL
+		req = httptest.NewRequest("DELETE", u.String(), nil)
+		w = httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		// Should succeed with presigned URL
+		assert.Equal(t, http.StatusNoContent, w.Code)
+
+		// Verify the file was deleted
+		req = httptest.NewRequest("GET", fmt.Sprintf("/public-bucket/%s", key), nil)
+		w = httptest.NewRecorder()
+		server.router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 }
 

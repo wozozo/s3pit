@@ -622,7 +622,7 @@ Run with custom tenants file:
 
 ## Public Buckets
 
-S3pit supports public bucket access, allowing certain buckets to be accessed without authentication. This is useful for serving static assets, public downloads, or development scenarios where authentication is not needed.
+S3pit supports public bucket access, allowing certain buckets to be accessed without authentication for read operations. This is useful for serving static assets, public downloads, or development scenarios where read-only public access is needed.
 
 ### Configuration
 
@@ -643,10 +643,24 @@ Configure public buckets in your `tenants.json`:
 }
 ```
 
+### Access Control
+
+Public buckets have the following access control behavior:
+
+| Operation | Without Authentication | With Authentication (Header/Presigned URL) |
+|-----------|------------------------|-------------------------------------------|
+| **GET** | ✅ Allowed | ✅ Allowed |
+| **HEAD** | ✅ Allowed | ✅ Allowed |
+| **OPTIONS** | ✅ Allowed | ✅ Allowed |
+| **PUT** | ❌ Denied | ✅ Allowed |
+| **POST** | ❌ Denied | ✅ Allowed |
+| **DELETE** | ❌ Denied | ✅ Allowed |
+
 ### Features
 
-- **Read-Only Access**: Public buckets allow GET/HEAD operations without authentication
-- **Write Protection**: PUT/DELETE/POST operations are blocked even with valid credentials (enforces read-only)
+- **Public Read Access**: GET/HEAD/OPTIONS operations allowed without authentication
+- **Authenticated Write Access**: Write operations (PUT/POST/DELETE) require valid authentication
+- **Presigned URL Support**: Enables secure temporary upload/delete permissions via presigned URLs
 - **Wildcard Support**: Use patterns like `"public-*"` to match multiple buckets
 - **Access Logging**: Clearly identifies public vs authenticated access in logs
 
@@ -654,28 +668,69 @@ Configure public buckets in your `tenants.json`:
 
 ```bash
 # Public bucket - no authentication needed for reading
-curl http://localhost:3333/static-assets/logo.png
+curl http://localhost:3333/static-assets/logo.png  # ✅ Works
 
-# Write operations are blocked (returns 403 Forbidden)
+# Direct write without authentication - denied
 curl -X PUT http://localhost:3333/static-assets/new-file.txt -d "data"
-# Error: Public buckets are read-only
+# ❌ Error: Public buckets require authentication for write operations
 
-# Private bucket - requires authentication
-curl http://localhost:3333/private-data/file.txt
-# Error: Access Denied
-
-# With authentication - works for private buckets
+# Write with authentication - allowed
 export AWS_ACCESS_KEY_ID=app-dev
 export AWS_SECRET_ACCESS_KEY=app-secret
-aws s3 cp s3://private-data/file.txt . --endpoint-url http://localhost:3333
+aws s3 cp file.txt s3://static-assets/ --endpoint-url http://localhost:3333
+# ✅ Upload succeeds with authentication
+
+# Generate presigned URL for temporary upload permission
+aws s3 presign s3://static-assets/upload.txt \
+  --endpoint-url http://localhost:3333 \
+  --expires-in 3600
+
+# Upload using presigned URL (no additional auth needed)
+curl -X PUT -T file.txt "$PRESIGNED_URL"
+# ✅ Upload succeeds with presigned URL
+
+# Private bucket - requires authentication for all operations
+curl http://localhost:3333/private-data/file.txt
+# ❌ Error: Access Denied
+```
+
+### Common Use Case: Frontend Applications
+
+This design is perfect for frontend applications that need:
+1. **Public read access** for serving assets (images, CSS, JS)
+2. **Secure uploads** via presigned URLs from the backend
+
+```javascript
+// Frontend: Display public image (no auth needed)
+<img src="http://localhost:3333/static-assets/logo.png" />
+
+// Backend: Generate presigned URL for upload
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
+
+const command = new PutObjectCommand({
+  Bucket: "static-assets",
+  Key: "user-upload.jpg"
+});
+
+const presignedUrl = await getSignedUrl(s3Client, command, { 
+  expiresIn: 3600 
+});
+
+// Frontend: Upload using presigned URL
+await fetch(presignedUrl, {
+  method: 'PUT',
+  body: fileData
+});
 ```
 
 ### Security Notes
 
-- Public buckets are strictly read-only to prevent unauthorized modifications
+- Public buckets allow unauthenticated read access only
+- All write operations require proper authentication (AWS Signature V4 or presigned URL)
 - Each tenant can define their own public buckets
 - Public access is logged with `Type: public` for audit purposes
-- Presigned URLs still work with public buckets for compatibility
+- Presigned URLs respect the authentication requirement for write operations
 
 ## API Compatibility Matrix
 

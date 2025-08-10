@@ -40,25 +40,32 @@ func (s *Server) authMiddleware() gin.HandlerFunc {
 				}
 			}
 		} else {
-			// For non-GET/HEAD methods, check if this is a public bucket and deny access
+			// For non-GET/HEAD methods, check if authentication credentials are present
 			bucket := c.Param("bucket")
-			if bucket != "" && s.tenantManager != nil {
+
+			// Check if authentication credentials are present (header auth or presigned URL)
+			hasAuthCredentials := c.Request.Header.Get("Authorization") != "" ||
+				c.Request.URL.Query().Get("X-Amz-Signature") != ""
+
+			if !hasAuthCredentials && bucket != "" && s.tenantManager != nil {
+				// No credentials provided - check if this is a public bucket
 				isPublic, _ := s.tenantManager.IsPublicBucket(bucket)
 				if isPublic {
-					// Public buckets are read-only
-					log.Printf("[AUTH] Access denied - Method: %s, Bucket: %s, Reason: Public buckets are read-only",
+					// Public buckets require authentication for write operations
+					log.Printf("[AUTH] Access denied - Method: %s, Bucket: %s, Reason: Public buckets require authentication for write operations",
 						c.Request.Method, bucket)
 					c.Header("Content-Type", "application/xml")
 					c.XML(http.StatusForbidden, gin.H{
 						"Error": gin.H{
 							"Code":    "AccessDenied",
-							"Message": "Public buckets are read-only",
+							"Message": "Public buckets require authentication for write operations",
 						},
 					})
 					c.Abort()
 					return
 				}
 			}
+			// If credentials are present, proceed to authentication below
 		}
 
 		// Perform authentication

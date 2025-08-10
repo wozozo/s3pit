@@ -147,12 +147,12 @@ func (h *Handler) handleListBuckets(c *gin.Context) {
 						}
 
 						allBuckets = append(allBuckets, map[string]interface{}{
-							"name":         entry.Name(),
-							"creationDate": creationTime,
-							"tenant":       "global",
-							"tenantDesc":   "Global Directory",
-							"path":         filepath.Join(globalDir, entry.Name()),
-							"isPublic":     false, // Global buckets are not public by default
+							"name":          entry.Name(),
+							"creationDate":  creationTime,
+							"tenant":        "global",
+							"tenantDesc":    "Global Directory",
+							"path":          filepath.Join(globalDir, entry.Name()),
+							"isPublic":      false, // Global buckets are not public by default
 							"publicPattern": "",
 						})
 					}
@@ -204,12 +204,12 @@ func (h *Handler) handleListBuckets(c *gin.Context) {
 					}
 
 					allBuckets = append(allBuckets, map[string]interface{}{
-						"name":         entry.Name(),
-						"creationDate": creationTime,
-						"tenant":       tenant.AccessKeyID,
-						"tenantDesc":   tenant.Description,
-						"path":         filepath.Join(tenantDir, entry.Name()),
-						"isPublic":     isPublic,
+						"name":          entry.Name(),
+						"creationDate":  creationTime,
+						"tenant":        tenant.AccessKeyID,
+						"tenantDesc":    tenant.Description,
+						"path":          filepath.Join(tenantDir, entry.Name()),
+						"isPublic":      isPublic,
 						"publicPattern": publicPattern,
 					})
 				}
