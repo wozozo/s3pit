@@ -1,13 +1,16 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/wozozo/s3pit/internal/config"
 	"github.com/wozozo/s3pit/internal/setup"
 	"github.com/wozozo/s3pit/pkg/server"
+	"github.com/wozozo/s3pit/pkg/tenant"
 )
 
 var serveCmd = &cobra.Command{
@@ -33,6 +36,46 @@ func init() {
 	serveCmd.Flags().String("log-dir", "./logs", "Directory for log files")
 	serveCmd.Flags().Bool("no-dashboard", false, "Disable web dashboard")
 	serveCmd.Flags().Int64("max-object-size", 5368709120, "Maximum object size in bytes")
+}
+
+// formatTenantsConfig formats the tenants configuration for display
+func formatTenantsConfig(config *tenant.TenantsConfig) string {
+	var parts []string
+
+	parts = append(parts, fmt.Sprintf("Global Directory: %s", config.GlobalDir))
+	parts = append(parts, fmt.Sprintf("Number of Tenants: %d", len(config.Tenants)))
+
+	for i, tenant := range config.Tenants {
+		parts = append(parts, fmt.Sprintf("  Tenant %d:", i+1))
+		parts = append(parts, fmt.Sprintf("    Access Key: %s", tenant.AccessKeyID))
+		parts = append(parts, fmt.Sprintf("    Secret Key: %s", tenant.SecretAccessKey))
+		if tenant.CustomDir != "" {
+			parts = append(parts, fmt.Sprintf("    Custom Directory: %s", tenant.CustomDir))
+		}
+		if tenant.Description != "" {
+			parts = append(parts, fmt.Sprintf("    Description: %s", tenant.Description))
+		}
+		if len(tenant.PublicBuckets) > 0 {
+			parts = append(parts, fmt.Sprintf("    Public Buckets: %s", strings.Join(tenant.PublicBuckets, ", ")))
+		}
+	}
+
+	return strings.Join(parts, "\n")
+}
+
+// loadTenantsConfig loads the tenants configuration from a file
+func loadTenantsConfig(filePath string) (*tenant.TenantsConfig, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var config tenant.TenantsConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("invalid JSON format: %w", err)
+	}
+
+	return &config, nil
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -124,6 +167,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Display current configuration
 	fmt.Printf("Current configuration:\n%s\n\n", serveCfg.String())
+
+	// Display tenants configuration if available
+	if serveCfg.TenantsFile != "" {
+		if _, err := os.Stat(serveCfg.TenantsFile); err == nil {
+			if tenantsConfig, err := loadTenantsConfig(serveCfg.TenantsFile); err == nil {
+				fmt.Printf("Tenants configuration:\n%s\n\n", formatTenantsConfig(tenantsConfig))
+			}
+		}
+	}
 
 	// Create and start server
 	srv, err := server.NewWithCmdLineOverrides(serveCfg, cmdLineOverrides)
