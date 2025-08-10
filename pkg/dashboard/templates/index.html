@@ -35,6 +35,7 @@
                                 <th>Bucket Name</th>
                                 <th>Creation Date</th>
                                 <th>Tenant</th>
+                                <th>Permissions</th>
                                 <th>Physical Path</th>
                                 <th>Actions</th>
                             </tr>
@@ -47,6 +48,14 @@
                                 <td class="bucket-date">{{ formatDate(bucket.creationDate) }}</td>
                                 <td class="bucket-tenant">
                                     <span :title="bucket.tenantDesc">{{ bucket.tenant || '-' }}</span>
+                                </td>
+                                <td class="bucket-permissions">
+                                    <span v-if="bucket.isPublic" class="permission-badge public" :title="'Pattern: ' + bucket.publicPattern">
+                                        🌐 Public
+                                    </span>
+                                    <span v-else class="permission-badge private">
+                                        🔒 Private
+                                    </span>
                                 </td>
                                 <td class="bucket-path" :title="bucket.path">
                                     <code>{{ bucket.path || '-' }}</code>

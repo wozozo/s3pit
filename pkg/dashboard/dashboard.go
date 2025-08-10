@@ -107,11 +107,25 @@ func (h *Handler) handleListBuckets(c *gin.Context) {
 		// First, get buckets from the global directory
 		globalDir := h.tenant.GetGlobalDir()
 		if globalDir != "" {
+			// Get list of tenant directory names to exclude them from global listing
+			tenantDirs := make(map[string]bool)
+			for _, tenant := range h.tenant.ListTenants() {
+				tenantDir := h.tenant.GetDirectory(tenant.AccessKeyID)
+				// Get relative path from global dir to tenant dir
+				if rel, err := filepath.Rel(globalDir, tenantDir); err == nil && !strings.Contains(rel, "..") {
+					tenantDirs[rel] = true
+				}
+			}
+
 			// Read global directory directly to find buckets
 			entries, err := os.ReadDir(globalDir)
 			if err == nil {
 				for _, entry := range entries {
 					if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+						// Skip if this directory is a tenant directory
+						if tenantDirs[entry.Name()] {
+							continue
+						}
 						info, err := entry.Info()
 						if err != nil {
 							continue
@@ -138,6 +152,8 @@ func (h *Handler) handleListBuckets(c *gin.Context) {
 							"tenant":       "global",
 							"tenantDesc":   "Global Directory",
 							"path":         filepath.Join(globalDir, entry.Name()),
+							"isPublic":     false, // Global buckets are not public by default
+							"publicPattern": "",
 						})
 					}
 				}
@@ -176,12 +192,25 @@ func (h *Handler) handleListBuckets(c *gin.Context) {
 						}
 					}
 
+					// Determine if this bucket is public for this tenant
+					isPublic := false
+					publicPattern := ""
+					for _, pattern := range tenant.PublicBuckets {
+						if matched, _ := filepath.Match(pattern, entry.Name()); matched {
+							isPublic = true
+							publicPattern = pattern
+							break
+						}
+					}
+
 					allBuckets = append(allBuckets, map[string]interface{}{
 						"name":         entry.Name(),
 						"creationDate": creationTime,
 						"tenant":       tenant.AccessKeyID,
 						"tenantDesc":   tenant.Description,
 						"path":         filepath.Join(tenantDir, entry.Name()),
+						"isPublic":     isPublic,
+						"publicPattern": publicPattern,
 					})
 				}
 			}
