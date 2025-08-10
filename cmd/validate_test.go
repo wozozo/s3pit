@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestValidateTenantsFile(t *testing.T) {
+func TestValidateConfigFile(t *testing.T) {
 	tests := []struct {
 		name        string
 		content     string
@@ -14,239 +14,196 @@ func TestValidateTenantsFile(t *testing.T) {
 	}{
 		{
 			name: "valid configuration",
-			content: `{
-				"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret_key",
-						"customDir": "/tmp/test",
-						"description": "Test tenant"
-					}
-				]
-			}`,
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = "test_secret_key"
+customDir = "/tmp/test"
+description = "Test tenant"
+`,
 			expectError: false,
 		},
 		{
 			name: "multiple valid tenants",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TENANT1_KEY",
-						"secretAccessKey": "tenant1_secret",
-						"customDir": "/tmp/tenant1",
-						"description": "Tenant 1"
-					},
-					{
-						"accessKeyId": "TENANT2_KEY",
-						"secretAccessKey": "tenant2_secret",
-						"customDir": "/tmp/tenant2",
-						"description": "Tenant 2"
-					}
-				]
-			}`,
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TENANT1_KEY"
+secretAccessKey = "tenant1_secret"
+customDir = "/tmp/tenant1"
+description = "Tenant 1"
+
+[[tenants]]
+accessKeyId = "TENANT2_KEY"
+secretAccessKey = "tenant2_secret"
+customDir = "/tmp/tenant2"
+description = "Tenant 2"
+`,
 			expectError: false,
 		},
 		{
-			name: "invalid JSON syntax",
-			content: `{
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret"
-						"customDir": "/tmp/test"
-					}
-				]
-			}`,
+			name: "invalid TOML syntax",
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = "test_secret"
+customDir = /tmp/test  # Missing quotes
+`,
 			expectError: true,
-			errorMsg:    "invalid JSON format",
+			errorMsg:    "invalid TOML format",
 		},
 		{
 			name: "empty tenants array",
-			content: `{
-				"tenants": []
-			}`,
+			content: `globalDir = "~/s3pit"
+tenants = []
+`,
 			expectError: true,
 			errorMsg:    "no tenants defined",
 		},
 		{
 			name: "missing accessKeyId",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"secretAccessKey": "test_secret",
-						"customDir": "/tmp/test"
-					}
-				]
-			}`,
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+secretAccessKey = "test_secret"
+customDir = "/tmp/test"
+`,
 			expectError: true,
 			errorMsg:    "accessKeyId is required",
 		},
 		{
 			name: "empty accessKeyId",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "",
-						"secretAccessKey": "test_secret",
-						"customDir": "/tmp/test"
-					}
-				]
-			}`,
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = ""
+secretAccessKey = "test_secret"
+customDir = "/tmp/test"
+`,
 			expectError: true,
 			errorMsg:    "accessKeyId is required",
 		},
 		{
 			name: "missing secretAccessKey",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"customDir": "/tmp/test"
-					}
-				]
-			}`,
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+customDir = "/tmp/test"
+`,
 			expectError: true,
 			errorMsg:    "secretAccessKey is required",
 		},
 		{
 			name: "empty secretAccessKey",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "",
-						"customDir": "/tmp/test"
-					}
-				]
-			}`,
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = ""
+customDir = "/tmp/test"
+`,
 			expectError: true,
 			errorMsg:    "secretAccessKey is required",
 		},
 		{
-			name: "missing global dataDir",
-			content: `{
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret"
-					}
-				]
-			}`,
+			name: "invalid customDir - relative path",
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = "test_secret"
+customDir = "relative/path"
+`,
 			expectError: true,
-			errorMsg:    "global globalDir is required",
+			errorMsg:    "customDir must be an absolute path",
 		},
 		{
-			name: "missing directory with global dataDir (valid)",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret"
-					}
-				]
-			}`,
-			expectError: false,
-		},
-		{
-			name: "empty directory with global dataDir (valid)",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret",
-						"customDir": ""
-					}
-				]
-			}`,
-			expectError: false,
-		},
-		{
-			name: "invalid global dataDir path",
-			content: `{
-		"globalDir": "relative/path",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret"
-					}
-				]
-			}`,
+			name: "invalid customDir - not a path",
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = "test_secret"
+customDir = "../relative/path"
+`,
 			expectError: true,
-			errorMsg:    "global globalDir must be an absolute path",
+			errorMsg:    "customDir must be an absolute path",
 		},
 		{
-			name: "invalid accessKeyId characters",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "INVALID@KEY",
-						"secretAccessKey": "test_secret",
-						"customDir": "/tmp/test"
-					}
-				]
-			}`,
+			name: "invalid accessKeyId format",
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST@KEY#INVALID"
+secretAccessKey = "test_secret"
+customDir = "/tmp/test"
+`,
 			expectError: true,
 			errorMsg:    "accessKeyId contains invalid characters",
 		},
 		{
-			name: "valid with tilde directory",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret",
-						"customDir": "~/test_data"
-					}
-				]
-			}`,
+			name: "valid with tilde expansion",
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = "test_secret"
+customDir = "~/test/tenant"
+`,
 			expectError: false,
 		},
 		{
-			name: "invalid relative directory path",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret",
-						"customDir": "relative/path"
-					}
-				]
-			}`,
-			expectError: true,
-			errorMsg:    "customDir must be an absolute path",
+			name: "valid with underscores and hyphens",
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY-123"
+secretAccessKey = "test_secret"
+customDir = "/tmp/test"
+`,
+			expectError: false,
 		},
 		{
-			name: "invalid relative directory (single dir)",
-			content: `{
-		"globalDir": "~/s3pit",
-				"tenants": [
-					{
-						"accessKeyId": "TEST_KEY",
-						"secretAccessKey": "test_secret",
-						"customDir": "data"
-					}
-				]
-			}`,
+			name: "missing globalDir",
+			content: `[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = "test_secret"
+customDir = "/tmp/test"
+`,
 			expectError: true,
-			errorMsg:    "customDir must be an absolute path",
+			errorMsg:    "global globalDir is required",
+		},
+		{
+			name: "invalid globalDir - relative path",
+			content: `globalDir = "relative/path"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = "test_secret"
+`,
+			expectError: true,
+			errorMsg:    "global globalDir must be an absolute path",
+		},
+		{
+			name: "valid with public buckets",
+			content: `globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "TEST_KEY"
+secretAccessKey = "test_secret"
+publicBuckets = ["public-*", "static-*"]
+`,
+			expectError: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create temporary file
-			tmpFile, err := os.CreateTemp("", "tenants_test_*.json")
+			// Create temp file
+			tmpFile, err := os.CreateTemp("", "config-*.toml")
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
@@ -254,18 +211,18 @@ func TestValidateTenantsFile(t *testing.T) {
 
 			// Write test content
 			if _, err := tmpFile.WriteString(tt.content); err != nil {
-				t.Fatalf("Failed to write temp file: %v", err)
+				t.Fatalf("Failed to write test content: %v", err)
 			}
 			tmpFile.Close()
 
 			// Validate the file
-			err = validateTenantsFile(tmpFile.Name())
+			err = validateConfigFile(tmpFile.Name())
 
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				} else if tt.errorMsg != "" && !containsString(err.Error(), tt.errorMsg) {
-					t.Errorf("Expected error message to contain '%s', got: %v", tt.errorMsg, err)
+					t.Errorf("Expected error containing '%s', got '%v'", tt.errorMsg, err)
 				}
 			} else {
 				if err != nil {
@@ -276,8 +233,8 @@ func TestValidateTenantsFile(t *testing.T) {
 	}
 }
 
-func TestValidateTenantsFileNotFound(t *testing.T) {
-	err := validateTenantsFile("/nonexistent/path/tenants.json")
+func TestValidateConfigFileNotFound(t *testing.T) {
+	err := validateConfigFile("/nonexistent/path/config.toml")
 	if err == nil {
 		t.Error("Expected error for non-existent file but got none")
 	}
@@ -293,39 +250,44 @@ func TestIsValidAccessKey(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "valid alphanumeric",
-			input:    "TEST123KEY",
+			name:     "valid with alphanumeric",
+			input:    "TEST_KEY123",
 			expected: true,
 		},
 		{
 			name:     "valid with underscores",
-			input:    "TEST_KEY_123",
+			input:    "test_key_123",
 			expected: true,
 		},
 		{
 			name:     "valid with hyphens",
-			input:    "TEST-KEY-123",
+			input:    "test-key-123",
 			expected: true,
 		},
 		{
-			name:     "invalid with at symbol",
-			input:    "TEST@KEY",
-			expected: false,
+			name:     "valid mixed case",
+			input:    "TestKey123",
+			expected: true,
 		},
 		{
 			name:     "invalid with spaces",
-			input:    "TEST KEY",
+			input:    "test key",
 			expected: false,
 		},
 		{
-			name:     "invalid with special characters",
-			input:    "TEST!KEY#",
+			name:     "invalid with special chars",
+			input:    "test@key#123",
+			expected: false,
+		},
+		{
+			name:     "invalid with dots",
+			input:    "test.key",
 			expected: false,
 		},
 		{
 			name:     "empty string",
 			input:    "",
-			expected: true, // Empty string has no invalid characters
+			expected: false,
 		},
 	}
 
@@ -333,7 +295,7 @@ func TestIsValidAccessKey(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isValidAccessKey(tt.input)
 			if result != tt.expected {
-				t.Errorf("isValidAccessKey(%s) = %v, expected %v", tt.input, result, tt.expected)
+				t.Errorf("isValidAccessKey(%q) = %v, want %v", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -346,38 +308,38 @@ func TestIsValidDirectoryPath(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "valid absolute path",
-			input:    "/home/user/data",
+			name:     "absolute path",
+			input:    "/tmp/test",
 			expected: true,
 		},
 		{
-			name:     "valid home directory path",
-			input:    "~/data",
+			name:     "home directory path",
+			input:    "~/test",
 			expected: true,
 		},
 		{
-			name:     "valid home directory nested path",
-			input:    "~/documents/s3pit",
-			expected: true,
-		},
-		{
-			name:     "invalid relative path",
-			input:    "relative/path",
+			name:     "relative path",
+			input:    "test/dir",
 			expected: false,
 		},
 		{
-			name:     "invalid single directory",
-			input:    "data",
+			name:     "parent directory path",
+			input:    "../test",
 			expected: false,
 		},
 		{
-			name:     "invalid path starting with tilde but no slash",
-			input:    "~data",
+			name:     "current directory",
+			input:    "./test",
 			expected: false,
 		},
 		{
-			name:     "empty path",
+			name:     "empty string",
 			input:    "",
+			expected: false,
+		},
+		{
+			name:     "single dot",
+			input:    ".",
 			expected: false,
 		},
 	}
@@ -386,13 +348,12 @@ func TestIsValidDirectoryPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isValidDirectoryPath(tt.input)
 			if result != tt.expected {
-				t.Errorf("isValidDirectoryPath(%s) = %v, expected %v", tt.input, result, tt.expected)
+				t.Errorf("isValidDirectoryPath(%q) = %v, want %v", tt.input, result, tt.expected)
 			}
 		})
 	}
 }
 
-// Helper function to check if a string contains a substring
 func containsString(s, substr string) bool {
 	return len(substr) == 0 || (len(s) >= len(substr) &&
 		func() bool {

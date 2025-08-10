@@ -42,7 +42,7 @@ s3-data/
 .s3pit_bucket_meta.json
 test.txt
 downloaded.txt
-tenants.json
+config.toml
 
 # OS
 .DS_Store

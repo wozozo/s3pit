@@ -1,11 +1,11 @@
 package config
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wozozo/s3pit/pkg/tenant"
@@ -98,10 +98,10 @@ func TestLoadFromEnv(t *testing.T) {
 
 func TestUpdateGlobalDirFromTenants(t *testing.T) {
 	tempDir := t.TempDir()
-	tenantsFile := filepath.Join(tempDir, "tenants.json")
+	configFile := filepath.Join(tempDir, "config.toml")
 
-	// Create test tenants.json
-	tenantsConfig := tenant.TenantsConfig{
+	// Create test config.toml
+	tenantsConfig := tenant.Config{
 		GlobalDir: tempDir + "/tenants-global",
 		Tenants: []tenant.Tenant{
 			{
@@ -111,10 +111,10 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 		},
 	}
 
-	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
+	configData, err := toml.Marshal(tenantsConfig)
 	require.NoError(t, err)
 
-	err = os.WriteFile(tenantsFile, configData, 0644)
+	err = os.WriteFile(configFile, configData, 0644)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -129,7 +129,7 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 			initialGlobalDir: tempDir + "/original",
 			skipUpdate:       false,
 			expectedDir:      tempDir + "/tenants-global",
-			description:      "Should update GlobalDir from tenants.json when skipUpdate is false",
+			description:      "Should update GlobalDir from config.toml when skipUpdate is false",
 		},
 		{
 			name:             "Don't update when skipUpdate is true",
@@ -143,7 +143,7 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 			initialGlobalDir: tempDir + "/original",
 			skipUpdate:       false,
 			expectedDir:      tempDir + "/original", // Should remain unchanged
-			description:      "Should not update when tenants.json has empty globalDir",
+			description:      "Should not update when config.toml has empty globalDir",
 		},
 	}
 
@@ -153,21 +153,21 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 				GlobalDir: tt.initialGlobalDir,
 			}
 
-			tenantMgr := tenant.NewManager(tenantsFile)
+			tenantMgr := tenant.NewManager(configFile)
 			err := tenantMgr.LoadFromFile()
 			require.NoError(t, err)
 
 			// For the empty globalDir test, temporarily clear it
 			if tt.name == "Handle empty tenants globalDir" {
 				// Create a tenant manager with empty globalDir
-				emptyTenantsConfig := tenant.TenantsConfig{
+				emptyTenantsConfig := tenant.Config{
 					GlobalDir: "", // Empty
 					Tenants:   tenantsConfig.Tenants,
 				}
-				emptyConfigData, err := json.MarshalIndent(emptyTenantsConfig, "", "  ")
+				emptyConfigData, err := toml.Marshal(emptyTenantsConfig)
 				require.NoError(t, err)
 
-				emptyTenantsFile := filepath.Join(tempDir, "empty-tenants.json")
+				emptyTenantsFile := filepath.Join(tempDir, "empty-config.toml")
 				err = os.WriteFile(emptyTenantsFile, emptyConfigData, 0644)
 				require.NoError(t, err)
 

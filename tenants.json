@@ -1,0 +1,11 @@
+{
+  "globalDir": "/Users/wozozo/src/github.com/wozozo/s3pit/data",
+  "tenants": [
+    {
+      "accessKeyId": "testkey",
+      "secretAccessKey": "testsecret",
+      "directory": "test-tenant",
+      "publicBuckets": ["public-test-bucket"]
+    }
+  ]
+}

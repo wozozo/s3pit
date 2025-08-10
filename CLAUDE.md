@@ -68,7 +68,7 @@ make run
 
 4. **Multi-tenancy** (`pkg/tenant/manager.go`)
    - Maps access keys to isolated storage directories
-   - Configured via tenants.json file
+   - Configured via config.toml file
 
 5. **Web Dashboard** (`pkg/dashboard/`)
    - Built-in web UI at `/dashboard`
@@ -95,7 +95,7 @@ Environment variables are loaded in `internal/config/config.go`. Key variables:
 - `S3PIT_AUTH_MODE`: Authentication mode
 - `S3PIT_IN_MEMORY`: Use memory storage instead of filesystem
 - `S3PIT_AUTO_CREATE_BUCKET`: Enable auto-create (default: true)
-- `S3PIT_TENANTS_FILE`: Path to tenants.json for multi-tenancy
+- `S3PIT_CONFIG_FILE`: Path to config.toml for multi-tenancy
 
 ## Testing Approach
 

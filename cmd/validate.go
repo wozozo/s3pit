@@ -1,21 +1,21 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/wozozo/s3pit/pkg/tenant"
 )
 
 var validateCmd = &cobra.Command{
 	Use:   "validate [path]",
-	Short: "Validate tenants.json configuration file",
-	Long: `Validate the tenants.json configuration file for syntax and semantic errors.
-If no path is provided, validates the default file at ~/.config/s3pit/tenants.json`,
+	Short: "Validate config.toml configuration file",
+	Long: `Validate the config.toml configuration file for syntax and semantic errors.
+If no path is provided, validates the default file at ~/.config/s3pit/config.toml`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runValidate,
 }
@@ -25,45 +25,45 @@ func init() {
 }
 
 func runValidate(cmd *cobra.Command, args []string) error {
-	var tenantsFile string
+	var configFile string
 
 	if len(args) > 0 {
-		tenantsFile = args[0]
+		configFile = args[0]
 	} else {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return fmt.Errorf("failed to get home directory: %w", err)
 		}
-		tenantsFile = filepath.Join(homeDir, ".config", "s3pit", "tenants.json")
+		configFile = filepath.Join(homeDir, ".config", "s3pit", "config.toml")
 	}
 
 	// Check if file exists
-	if _, err := os.Stat(tenantsFile); os.IsNotExist(err) {
-		return fmt.Errorf("tenants.json file not found at: %s", tenantsFile)
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		return fmt.Errorf("config.toml file not found at: %s", configFile)
 	}
 
-	fmt.Printf("Validating tenants configuration: %s\n", tenantsFile)
+	fmt.Printf("Validating configuration: %s\n", configFile)
 
 	// Validate the file
-	if err := validateTenantsFile(tenantsFile); err != nil {
+	if err := validateConfigFile(configFile); err != nil {
 		fmt.Printf("❌ Validation failed: %v\n", err)
 		return err
 	}
 
-	fmt.Println("✅ Validation successful: tenants.json is valid")
+	fmt.Println("✅ Validation successful: config.toml is valid")
 	return nil
 }
 
-func validateTenantsFile(filePath string) error {
-	// Read and parse the JSON file
+func validateConfigFile(filePath string) error {
+	// Read and parse the TOML file
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	var config tenant.TenantsConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("invalid JSON format: %w", err)
+	var config tenant.Config
+	if err := toml.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("invalid TOML format: %w", err)
 	}
 
 	// Validate structure and content
@@ -104,6 +104,9 @@ func validateTenantsFile(filePath string) error {
 
 // isValidAccessKey checks if access key contains only valid characters
 func isValidAccessKey(key string) bool {
+	if key == "" {
+		return false
+	}
 	for _, r := range key {
 		if !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-') {
 			return false

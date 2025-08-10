@@ -1,25 +1,26 @@
 package tenant
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 type Tenant struct {
-	AccessKeyID     string   `json:"accessKeyId"`
-	SecretAccessKey string   `json:"secretAccessKey"`
-	CustomDir       string   `json:"customDir"`
-	Description     string   `json:"description,omitempty"`
-	PublicBuckets   []string `json:"publicBuckets"` // List of public buckets for this tenant
+	AccessKeyID     string   `toml:"accessKeyId"`
+	SecretAccessKey string   `toml:"secretAccessKey"`
+	CustomDir       string   `toml:"customDir"`
+	Description     string   `toml:"description,omitempty"`
+	PublicBuckets   []string `toml:"publicBuckets"` // List of public buckets for this tenant
 }
 
-type TenantsConfig struct {
-	GlobalDir string   `json:"globalDir,omitempty"`
-	Tenants   []Tenant `json:"tenants"`
+type Config struct {
+	GlobalDir string   `toml:"globalDir,omitempty"`
+	Tenants   []Tenant `toml:"tenants"`
 }
 
 type Manager struct {
@@ -46,18 +47,18 @@ func (m *Manager) LoadFromFile() error {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return fmt.Errorf("failed to read tenants file: %w", err)
+		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	var config TenantsConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("failed to parse tenants file: %w", err)
+	var config Config
+	if err := toml.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Store the global directory from tenants.json
+	// Store the global directory from config.toml
 	if config.GlobalDir != "" {
 		m.globalDir = expandTilde(config.GlobalDir)
 	}
@@ -124,7 +125,7 @@ func (m *Manager) GetAllTenants() map[string]string {
 	return result
 }
 
-// GetGlobalDir returns the global directory from tenants.json
+// GetGlobalDir returns the global directory from config.toml
 func (m *Manager) GetGlobalDir() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -199,7 +200,7 @@ func (m *Manager) ListTenants() []*Tenant {
 }
 
 func (m *Manager) saveToFile() error {
-	config := TenantsConfig{
+	config := Config{
 		GlobalDir: m.globalDir,
 		Tenants:   make([]Tenant, 0, len(m.tenants)),
 	}
@@ -208,9 +209,9 @@ func (m *Manager) saveToFile() error {
 		config.Tenants = append(config.Tenants, *tenant)
 	}
 
-	data, err := json.MarshalIndent(config, "", "  ")
+	data, err := toml.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal tenants: %w", err)
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
 	return os.WriteFile(m.configFile, data, 0644)

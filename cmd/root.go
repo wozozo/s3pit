@@ -24,7 +24,7 @@ func init() {
 	rootCmd.PersistentFlags().StringP("host", "H", "0.0.0.0", "Server host")
 
 	rootCmd.PersistentFlags().String("auth-mode", "sigv4", "Authentication mode (sigv4 only)")
-	rootCmd.PersistentFlags().String("tenants-file", "", "Path to tenants.json file for multi-tenancy")
+	rootCmd.PersistentFlags().String("config-file", "", "Path to config.toml file for multi-tenancy")
 	rootCmd.PersistentFlags().Bool("in-memory", false, "Use in-memory storage instead of filesystem")
 	rootCmd.PersistentFlags().Bool("dashboard", true, "Enable web dashboard")
 	rootCmd.PersistentFlags().Bool("auto-create-bucket", true, "Automatically create buckets on first upload")
@@ -43,11 +43,11 @@ func initConfig() {
 	if authMode, _ := rootCmd.Flags().GetString("auth-mode"); rootCmd.Flags().Changed("auth-mode") {
 		cfg.AuthMode = authMode
 	}
-	// Only override tenants file if explicitly provided
+	// Only override config file if explicitly provided
 	// The Changed() check should prevent overriding when not specified
-	if rootCmd.Flags().Changed("tenants-file") {
-		tenantsFile, _ := rootCmd.Flags().GetString("tenants-file")
-		cfg.TenantsFile = tenantsFile
+	if rootCmd.Flags().Changed("config-file") {
+		configFile, _ := rootCmd.Flags().GetString("config-file")
+		cfg.ConfigFile = configFile
 	}
 	if inMemory, _ := rootCmd.Flags().GetBool("in-memory"); rootCmd.Flags().Changed("in-memory") {
 		cfg.InMemory = inMemory
@@ -61,7 +61,7 @@ func initConfig() {
 }
 
 func runServer(cmd *cobra.Command, args []string) error {
-	// Initialize config directory and default tenants.json if needed
+	// Initialize config directory and default config.toml if needed
 	if err := setup.InitializeConfigDir(); err != nil {
 		// Log the error but don't fail - it's not critical
 		cmd.Printf("Warning: Failed to initialize config directory: %v\n", err)

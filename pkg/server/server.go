@@ -51,12 +51,12 @@ func NewWithCmdLineOverrides(cfg *config.Config, cmdLineOverrides map[string]boo
 	logInstance.SetMaxEntries(cfg.MaxLogEntries)
 
 	// Initialize tenant manager first
-	tenantMgr := tenant.NewManager(cfg.TenantsFile)
-	if cfg.TenantsFile != "" {
+	tenantMgr := tenant.NewManager(cfg.ConfigFile)
+	if cfg.ConfigFile != "" {
 		if err := tenantMgr.LoadFromFile(); err != nil {
-			log.Printf("Warning: failed to load tenants file: %v", err)
+			log.Printf("Warning: failed to load config file: %v", err)
 		} else {
-			// Update config with dataDir from tenants.json if available
+			// Update config with dataDir from config.toml if available
 			// Skip update if GlobalDir was explicitly set via command line
 			cfg.UpdateGlobalDirFromTenants(tenantMgr, cmdLineOverrides["global-dir"])
 
@@ -69,7 +69,7 @@ func NewWithCmdLineOverrides(cfg *config.Config, cmdLineOverrides map[string]boo
 	var err error
 
 	// Use tenant-aware storage if tenants are configured
-	if cfg.TenantsFile != "" && tenantMgr != nil {
+	if cfg.ConfigFile != "" && tenantMgr != nil {
 		storageBackend = storage.NewTenantAwareStorage(cfg.GlobalDir, tenantMgr, cfg.InMemory)
 	} else if cfg.InMemory {
 		storageBackend = storage.NewMemoryStorage()
@@ -222,10 +222,10 @@ func (s *Server) Start() error {
 	log.Printf("Storage: %s", s.getStorageType())
 
 	// Log tenant information if using tenant manager
-	if s.tenantManager != nil && s.config.TenantsFile != "" {
+	if s.tenantManager != nil && s.config.ConfigFile != "" {
 		tenants := s.tenantManager.ListTenants()
 		if len(tenants) > 0 {
-			log.Printf("Loaded %d tenant(s) from %s", len(tenants), s.config.TenantsFile)
+			log.Printf("Loaded %d tenant(s) from %s", len(tenants), s.config.ConfigFile)
 			for _, t := range tenants {
 				dir := s.tenantManager.GetDirectory(t.AccessKeyID)
 				log.Printf("  - %s: %s", t.AccessKeyID, dir)

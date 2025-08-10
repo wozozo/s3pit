@@ -1,19 +1,20 @@
 package tenant
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/pelletier/go-toml/v2"
 )
 
 func TestLoadTenants(t *testing.T) {
 	// Create temporary directory for test
 	tempDir := t.TempDir()
-	tenantsFile := filepath.Join(tempDir, "tenants.json")
+	configFile := filepath.Join(tempDir, "config.toml")
 
-	// Create test tenants.json
-	config := TenantsConfig{
+	// Create test config.toml
+	config := Config{
 		Tenants: []Tenant{
 			{
 				AccessKeyID:     "test-key-1",
@@ -28,21 +29,21 @@ func TestLoadTenants(t *testing.T) {
 		},
 	}
 
-	data, err := json.Marshal(config)
+	data, err := toml.Marshal(config)
 	if err != nil {
 		t.Fatalf("Failed to marshal test data: %v", err)
 	}
 
-	err = os.WriteFile(tenantsFile, data, 0644)
+	err = os.WriteFile(configFile, data, 0644)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
 	// Test loading
-	manager := NewManager(tenantsFile)
+	manager := NewManager(configFile)
 	err = manager.LoadFromFile()
 	if err != nil {
-		t.Fatalf("Failed to load tenants: %v", err)
+		t.Fatalf("Failed to load config: %v", err)
 	}
 
 	// Verify loaded data

@@ -36,60 +36,52 @@ A lightweight S3-compatible storage server designed for **multi-project developm
 
 ### Step 1: One-Time Configuration
 
-Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize it):
+Create `~/.config/s3pit/config.toml` (auto-created on first run, or customize it):
 
 **Option A: Repository-Local Storage** (each project's data in its own repo)
-```json
-{
-  "globalDir": "~/s3pit",
-  "tenants": [
-    {
-      "accessKeyId": "ecommerce-dev",
-      "secretAccessKey": "ecommerce-secret",
-      "customDir": "~/src/github.com/yourname/ecommerce-app/data",
-      "description": "E-commerce app development",
-      "publicBuckets": ["product-images"]
-    },
-    {
-      "accessKeyId": "blog-dev",
-      "secretAccessKey": "blog-secret",
-      "customDir": "~/src/github.com/yourname/blog-platform/data",
-      "description": "Blog platform development",
-      "publicBuckets": ["public-assets"]
-    },
-    {
-      "accessKeyId": "images-dev",
-      "secretAccessKey": "images-secret",
-      "customDir": "~/src/github.com/yourname/image-processor/data",
-      "description": "Image processor development",
-      "publicBuckets": []
-    }
-  ]
-}
+```toml
+globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "ecommerce-dev"
+secretAccessKey = "ecommerce-secret"
+customDir = "~/src/github.com/yourname/ecommerce-app/data"
+description = "E-commerce app development"
+publicBuckets = ["product-images"]
+
+[[tenants]]
+accessKeyId = "blog-dev"
+secretAccessKey = "blog-secret"
+customDir = "~/src/github.com/yourname/blog-platform/data"
+description = "Blog platform development"
+publicBuckets = ["public-assets"]
+
+[[tenants]]
+accessKeyId = "images-dev"
+secretAccessKey = "images-secret"
+customDir = "~/src/github.com/yourname/image-processor/data"
+description = "Image processor development"
+publicBuckets = []
 ```
 
 **Option B: Centralized Storage** (all projects under one directory)
-```json
-{
-  "globalDir": "~/s3pit",
-  "tenants": [
-    {
-      "accessKeyId": "ecommerce-dev",
-      "secretAccessKey": "ecommerce-secret",
-      "description": "E-commerce app development"
-    },
-    {
-      "accessKeyId": "blog-dev",
-      "secretAccessKey": "blog-secret",
-      "description": "Blog platform development"
-    },
-    {
-      "accessKeyId": "images-dev",
-      "secretAccessKey": "images-secret",
-      "description": "Image processor development"
-    }
-  ]
-}
+```toml
+globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "ecommerce-dev"
+secretAccessKey = "ecommerce-secret"
+description = "E-commerce app development"
+
+[[tenants]]
+accessKeyId = "blog-dev"
+secretAccessKey = "blog-secret"
+description = "Blog platform development"
+
+[[tenants]]
+accessKeyId = "images-dev"
+secretAccessKey = "images-secret"
+description = "Image processor development"
 ```
 
 > **💡 Auto-Organization**: When `customDir` is omitted, S3pit automatically organizes projects under the global `globalDir`:
@@ -357,7 +349,7 @@ Options:
   --port int                  Server port (default 3333)
   --global-dir string         Override global directory path
   --auth-mode string          Authentication mode: sigv4 (default "sigv4")
-  --tenants-file string       Path to tenants.json for multi-tenancy
+  --config-file string        Path to config.toml for multi-tenancy
   --in-memory                 Use in-memory storage
   --dashboard                 Enable web dashboard (default true)
   --auto-create-bucket        Auto-create buckets on upload (default true)
@@ -393,7 +385,7 @@ All command-line options can be configured via environment variables with the `S
 | `S3PIT_MAX_LOG_ENTRIES` | int | 10000 | Max in-memory log entries for dashboard |
 | `S3PIT_MAX_OBJECT_SIZE` | int | 5368709120 | Max object size in bytes (default 5GB) |
 | `S3PIT_ENABLE_DASHBOARD` | bool | true | Enable web dashboard at /dashboard |
-| `S3PIT_TENANTS_FILE` | string | "~/.config/s3pit/tenants.json" | Path to tenants.json for multi-tenancy (auto-created) |
+| `S3PIT_CONFIG_FILE` | string | "~/.config/s3pit/config.toml" | Path to config.toml for multi-tenancy (auto-created) |
 | `S3PIT_READ_DELAY_MS` | int | 0 | Fixed delay for read operations in milliseconds |
 | `S3PIT_READ_DELAY_RANDOM_MIN_MS` | int | 0 | Minimum random delay for read operations in milliseconds |
 | `S3PIT_READ_DELAY_RANDOM_MAX_MS` | int | 0 | Maximum random delay for read operations in milliseconds |
@@ -465,34 +457,30 @@ S3pit supports multi-tenancy by mapping different access keys to isolated storag
 
 On first run, S3pit automatically:
 1. Creates `~/.config/s3pit/` directory
-2. Generates a default `tenants.json` with sample credentials
-3. Loads `~/.config/s3pit/tenants.json` by default (if no `--tenants-file` specified)
+2. Generates a default `config.toml` with sample credentials
+3. Loads `~/.config/s3pit/config.toml` by default (if no `--config-file` specified)
 
-Default `tenants.json` created at `~/.config/s3pit/tenants.json`:
-```json
-{
-  "globalDir": "~/s3pit/data",
-  "tenants": [
-    {
-      "accessKeyId": "local-dev",
-      "secretAccessKey": "local-dev-secret",
-      "description": "Local development with public assets (public-*, static-*, cdn-*)",
-      "publicBuckets": ["public-*", "static-*", "cdn-*"]
-    },
-    {
-      "accessKeyId": "test-app",
-      "secretAccessKey": "test-app-secret",
-      "description": "Test application with specific public buckets",
-      "publicBuckets": ["assets", "downloads"]
-    },
-    {
-      "accessKeyId": "private-app",
-      "secretAccessKey": "private-app-secret",
-      "description": "Private application (all buckets require authentication)",
-      "publicBuckets": []
-    }
-  ]
-}
+Default `config.toml` created at `~/.config/s3pit/config.toml`:
+```toml
+globalDir = "~/s3pit/data"
+
+[[tenants]]
+accessKeyId = "local-dev"
+secretAccessKey = "local-dev-secret"
+description = "Local development with public assets (public-*, static-*, cdn-*)"
+publicBuckets = ["public-*", "static-*", "cdn-*"]
+
+[[tenants]]
+accessKeyId = "test-app"
+secretAccessKey = "test-app-secret"
+description = "Test application with specific public buckets"
+publicBuckets = ["assets", "downloads"]
+
+[[tenants]]
+accessKeyId = "private-app"
+secretAccessKey = "private-app-secret"
+description = "Private application (all buckets require authentication)"
+publicBuckets = []
 ```
 
 **Default Tenants Explained:**
@@ -514,26 +502,22 @@ Default `tenants.json` created at `~/.config/s3pit/tenants.json`:
 
 S3pit's unique selling point is **flexible directory mapping** that reduces cognitive load during development. Instead of managing separate storage locations, you can store S3 uploads directly within your project repositories:
 
-```json
-{
-  "globalDir": "~/s3pit",
-  "tenants": [
-    {
-      "accessKeyId": "app1-dev",
-      "secretAccessKey": "app1-secret",
-      "customDir": "~/src/github.com/example-user/app1/data",
-      "description": "App1 development storage",
-      "publicBuckets": []
-    },
-    {
-      "accessKeyId": "app2-dev",
-      "secretAccessKey": "app2-secret",
-      "customDir": "~/src/github.com/example-user/app2/data",
-      "description": "App2 development storage",
-      "publicBuckets": ["public-assets"]
-    }
-  ]
-}
+```toml
+globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "app1-dev"
+secretAccessKey = "app1-secret"
+customDir = "~/src/github.com/example-user/app1/data"
+description = "App1 development storage"
+publicBuckets = []
+
+[[tenants]]
+accessKeyId = "app2-dev"
+secretAccessKey = "app2-secret"
+customDir = "~/src/github.com/example-user/app2/data"
+description = "App2 development storage"
+publicBuckets = ["public-assets"]
 ```
 
 **Benefits of Repository-Local Storage:**
@@ -623,12 +607,12 @@ S3pit uses a simple priority system to determine where to store data:
 # project-b uploads → ~/myapp/data/my-bucket/file.txt
 ```
 
-Run with custom tenants file:
+Run with custom config file:
 ```bash
-# Use custom tenants file
-./s3pit serve --tenants-file /path/to/tenants.json --auth-mode sigv4
+# Use custom config file
+./s3pit serve --config-file /path/to/config.toml --auth-mode sigv4
 
-# Use default ~/.config/s3pit/tenants.json
+# Use default ~/.config/s3pit/config.toml
 ./s3pit serve --auth-mode sigv4
 ```
 
@@ -638,21 +622,17 @@ S3pit supports public bucket access, allowing certain buckets to be accessed wit
 
 ### Configuration
 
-Configure public buckets in your `tenants.json`:
+Configure public buckets in your `config.toml`:
 
-```json
-{
-  "globalDir": "~/s3pit",
-  "tenants": [
-    {
-      "accessKeyId": "app-dev",
-      "secretAccessKey": "app-secret",
-      "customDir": "~/src/app/data",
-      "description": "Application with public assets",
-      "publicBuckets": ["static-assets", "downloads", "public-*"]
-    }
-  ]
-}
+```toml
+globalDir = "~/s3pit"
+
+[[tenants]]
+accessKeyId = "app-dev"
+secretAccessKey = "app-secret"
+customDir = "~/src/app/data"
+description = "Application with public assets"
+publicBuckets = ["static-assets", "downloads", "public-*"]
 ```
 
 ### Access Control
@@ -838,8 +818,8 @@ steps:
 Set up isolated storage for different clients:
 
 ```bash
-# Create tenants.json with isolated directories
-s3pit serve --tenants-file tenants.json
+# Create config.toml with isolated directories
+s3pit serve --config-file config.toml
 
 # Each access key gets its own storage directory
 AWS_ACCESS_KEY_ID=customer1 AWS_SECRET_ACCESS_KEY=customer1secret \

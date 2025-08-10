@@ -1,15 +1,15 @@
 package setup
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/wozozo/s3pit/pkg/tenant"
 )
 
-// InitializeConfigDir creates the config directory and default tenants.json if they don't exist
+// InitializeConfigDir creates the config directory and default config.toml if they don't exist
 func InitializeConfigDir() error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -23,19 +23,19 @@ func InitializeConfigDir() error {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	tenantsFile := filepath.Join(configDir, "tenants.json")
+	configFile := filepath.Join(configDir, "config.toml")
 
-	// Check if tenants.json already exists
-	if _, err := os.Stat(tenantsFile); err == nil {
+	// Check if config.toml already exists
+	if _, err := os.Stat(configFile); err == nil {
 		// File exists, do nothing
 		return nil
 	} else if !os.IsNotExist(err) {
 		// Some other error occurred
-		return fmt.Errorf("failed to check tenants.json: %w", err)
+		return fmt.Errorf("failed to check config.toml: %w", err)
 	}
 
-	// Create developer-friendly default tenants configuration
-	defaultConfig := tenant.TenantsConfig{
+	// Create developer-friendly default configuration
+	defaultConfig := tenant.Config{
 		GlobalDir: "~/s3pit/data",
 		Tenants: []tenant.Tenant{
 			{
@@ -59,18 +59,18 @@ func InitializeConfigDir() error {
 		},
 	}
 
-	// Marshal to JSON with indentation
-	data, err := json.MarshalIndent(defaultConfig, "", "  ")
+	// Marshal to TOML
+	data, err := toml.Marshal(defaultConfig)
 	if err != nil {
-		return fmt.Errorf("failed to marshal tenants: %w", err)
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
 	// Write to file
-	if err := os.WriteFile(tenantsFile, data, 0644); err != nil {
-		return fmt.Errorf("failed to write tenants.json: %w", err)
+	if err := os.WriteFile(configFile, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config.toml: %w", err)
 	}
 
-	fmt.Printf("\n✅ Created default configuration at %s\n", tenantsFile)
+	fmt.Printf("\n✅ Created default configuration at %s\n", configFile)
 	fmt.Printf("\n📋 Default tenants created:\n")
 	fmt.Printf("  • 'local-dev': Development with public buckets (public-*, static-*, cdn-*)\n")
 	fmt.Printf("  • 'test-app': Testing with specific public buckets (assets, downloads)\n")

@@ -5,7 +5,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -18,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/wozozo/s3pit/internal/config"
 	"github.com/wozozo/s3pit/pkg/api"
@@ -431,11 +431,11 @@ func TestCommandLineOverrides(t *testing.T) {
 
 	// Create temporary directory for test
 	tempDir := t.TempDir()
-	tenantsFile := filepath.Join(tempDir, "tenants.json")
+	configFile := filepath.Join(tempDir, "config.toml")
 
-	// Create test tenants.json with globalDir setting
-	tenantsConfig := tenant.TenantsConfig{
-		GlobalDir: tempDir + "/from-tenants-json",
+	// Create test config.toml with globalDir setting
+	tenantsConfig := tenant.Config{
+		GlobalDir: tempDir + "/from-config-toml",
 		Tenants: []tenant.Tenant{
 			{
 				AccessKeyID:     "test-tenant",
@@ -445,10 +445,10 @@ func TestCommandLineOverrides(t *testing.T) {
 		},
 	}
 
-	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
+	configData, err := toml.Marshal(tenantsConfig)
 	assert.NoError(t, err)
 
-	err = os.WriteFile(tenantsFile, configData, 0644)
+	err = os.WriteFile(configFile, configData, 0644)
 	assert.NoError(t, err)
 
 	tests := []struct {
@@ -459,34 +459,34 @@ func TestCommandLineOverrides(t *testing.T) {
 		description string
 	}{
 		{
-			name: "No command line override - use tenants.json",
+			name: "No command line override - use config.toml",
 			baseConfig: &config.Config{
-				Port:        3333,
-				Host:        "localhost",
-				GlobalDir:   tempDir + "/default",
-				TenantsFile: tenantsFile,
-				InMemory:    true,
-				AuthMode:    "sigv4",
+				Port:       3333,
+				Host:       "localhost",
+				GlobalDir:  tempDir + "/default",
+				ConfigFile: configFile,
+				InMemory:   true,
+				AuthMode:   "sigv4",
 			},
 			overrides:   make(map[string]bool),
-			expectedDir: tempDir + "/from-tenants-json",
-			description: "Should use globalDir from tenants.json when no command line override",
+			expectedDir: tempDir + "/from-config-toml",
+			description: "Should use globalDir from config.toml when no command line override",
 		},
 		{
-			name: "Command line override - ignore tenants.json",
+			name: "Command line override - ignore config.toml",
 			baseConfig: &config.Config{
-				Port:        3333,
-				Host:        "localhost",
-				GlobalDir:   tempDir + "/from-cmdline",
-				TenantsFile: tenantsFile,
-				InMemory:    true,
-				AuthMode:    "sigv4",
+				Port:       3333,
+				Host:       "localhost",
+				GlobalDir:  tempDir + "/from-cmdline",
+				ConfigFile: configFile,
+				InMemory:   true,
+				AuthMode:   "sigv4",
 			},
 			overrides: map[string]bool{
 				"global-dir": true,
 			},
 			expectedDir: tempDir + "/from-cmdline",
-			description: "Should use command line globalDir and ignore tenants.json setting",
+			description: "Should use command line globalDir and ignore config.toml setting",
 		},
 		{
 			name: "Multiple command line overrides",
@@ -494,7 +494,7 @@ func TestCommandLineOverrides(t *testing.T) {
 				Port:             3334,
 				Host:             "127.0.0.1",
 				GlobalDir:        tempDir + "/from-cmdline-multi",
-				TenantsFile:      tenantsFile,
+				ConfigFile:       configFile,
 				InMemory:         false,
 				AuthMode:         "sigv4",
 				AutoCreateBucket: false,
@@ -532,10 +532,10 @@ func TestCommandLineOverrides(t *testing.T) {
 // TestUpdateGlobalDirFromTenants tests the UpdateGlobalDirFromTenants functionality
 func TestUpdateGlobalDirFromTenants(t *testing.T) {
 	tempDir := t.TempDir()
-	tenantsFile := filepath.Join(tempDir, "tenants.json")
+	configFile := filepath.Join(tempDir, "config.toml")
 
-	// Create test tenants.json
-	tenantsConfig := tenant.TenantsConfig{
+	// Create test config.toml
+	tenantsConfig := tenant.Config{
 		GlobalDir: tempDir + "/tenants-global",
 		Tenants: []tenant.Tenant{
 			{
@@ -545,10 +545,10 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 		},
 	}
 
-	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
+	configData, err := toml.Marshal(tenantsConfig)
 	assert.NoError(t, err)
 
-	err = os.WriteFile(tenantsFile, configData, 0644)
+	err = os.WriteFile(configFile, configData, 0644)
 	assert.NoError(t, err)
 
 	// Test without command line override
@@ -556,7 +556,7 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 		GlobalDir: tempDir + "/original",
 	}
 
-	tenantMgr := tenant.NewManager(tenantsFile)
+	tenantMgr := tenant.NewManager(configFile)
 	err = tenantMgr.LoadFromFile()
 	assert.NoError(t, err)
 
@@ -576,10 +576,10 @@ func TestServerWithTenantManager(t *testing.T) {
 	logger.GetInstance().SetMaxEntries(100)
 
 	tempDir := t.TempDir()
-	tenantsFile := filepath.Join(tempDir, "tenants.json")
+	configFile := filepath.Join(tempDir, "config.toml")
 
-	// Create test tenants.json
-	tenantsConfig := tenant.TenantsConfig{
+	// Create test config.toml
+	tenantsConfig := tenant.Config{
 		GlobalDir: tempDir + "/tenant-base",
 		Tenants: []tenant.Tenant{
 			{
@@ -595,18 +595,18 @@ func TestServerWithTenantManager(t *testing.T) {
 		},
 	}
 
-	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
+	configData, err := toml.Marshal(tenantsConfig)
 	assert.NoError(t, err)
 
-	err = os.WriteFile(tenantsFile, configData, 0644)
+	err = os.WriteFile(configFile, configData, 0644)
 	assert.NoError(t, err)
 
 	cfg := &config.Config{
 		Port:        3333,
 		Host:        "localhost",
-		GlobalDir:   tempDir + "/default",
-		TenantsFile: tenantsFile,
-		InMemory:    false,
+		GlobalDir:  tempDir + "/default",
+		ConfigFile: configFile,
+		InMemory:   false,
 		AuthMode:    "sigv4",
 	}
 

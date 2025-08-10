@@ -1,12 +1,12 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/wozozo/s3pit/internal/config"
 	"github.com/wozozo/s3pit/internal/setup"
@@ -43,7 +43,7 @@ func init() {
 	serveCmd.Flags().StringP("host", "H", "0.0.0.0", "Server host")
 	serveCmd.Flags().String("global-dir", "", "Override global directory path")
 	serveCmd.Flags().String("auth-mode", "sigv4", "Authentication mode (sigv4 only)")
-	serveCmd.Flags().String("tenants-file", "", "Path to tenants.json file for multi-tenancy")
+	serveCmd.Flags().String("config-file", "", "Path to config.toml file for multi-tenancy")
 	serveCmd.Flags().Bool("in-memory", false, "Use in-memory storage instead of filesystem")
 	serveCmd.Flags().Bool("dashboard", true, "Enable web dashboard")
 	serveCmd.Flags().Bool("auto-create-bucket", true, "Automatically create buckets on first upload")
@@ -90,8 +90,8 @@ func formatMainConfig(cfg *config.Config) string {
 	// Authentication
 	parts = append(parts, fmt.Sprintf("%s%sAuthentication:%s", ColorBold, ColorGreen, ColorReset))
 	parts = append(parts, fmt.Sprintf("  %sMode:%s %s%s%s", ColorBlue, ColorReset, ColorCyan, cfg.AuthMode, ColorReset))
-	if cfg.TenantsFile != "" {
-		parts = append(parts, fmt.Sprintf("  %sTenants File:%s %s%s%s", ColorBlue, ColorReset, ColorDim, cfg.TenantsFile, ColorReset))
+	if cfg.ConfigFile != "" {
+		parts = append(parts, fmt.Sprintf("  %sConfig File:%s %s%s%s", ColorBlue, ColorReset, ColorDim, cfg.ConfigFile, ColorReset))
 	}
 	parts = append(parts, "")
 
@@ -152,7 +152,7 @@ func formatMainConfig(cfg *config.Config) string {
 }
 
 // formatTenantsConfig formats the tenants configuration for display
-func formatTenantsConfig(config *tenant.TenantsConfig) string {
+func formatTenantsConfig(config *tenant.Config) string {
 	var parts []string
 
 	// Header
@@ -189,15 +189,15 @@ func formatTenantsConfig(config *tenant.TenantsConfig) string {
 }
 
 // loadTenantsConfig loads the tenants configuration from a file
-func loadTenantsConfig(filePath string) (*tenant.TenantsConfig, error) {
+func loadTenantsConfig(filePath string) (*tenant.Config, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	var config tenant.TenantsConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("invalid JSON format: %w", err)
+	var config tenant.Config
+	if err := toml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("invalid TOML format: %w", err)
 	}
 
 	return &config, nil
@@ -247,10 +247,10 @@ func runServe(cmd *cobra.Command, args []string) error {
 		serveCfg.AuthMode = authMode
 		cmdLineOverrides["auth-mode"] = true
 	}
-	if cmd.Flags().Changed("tenants-file") {
-		tenantsFile, _ := cmd.Flags().GetString("tenants-file")
-		serveCfg.TenantsFile = tenantsFile
-		cmdLineOverrides["tenants-file"] = true
+	if cmd.Flags().Changed("config-file") {
+		configFile, _ := cmd.Flags().GetString("config-file")
+		serveCfg.ConfigFile = configFile
+		cmdLineOverrides["config-file"] = true
 	}
 	if inMemory, _ := cmd.Flags().GetBool("in-memory"); cmd.Flags().Changed("in-memory") {
 		serveCfg.InMemory = inMemory
@@ -307,7 +307,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		cmdLineOverrides["write-delay-random-max"] = true
 	}
 
-	// Initialize config directory and default tenants.json if needed
+	// Initialize config directory and default config.toml if needed
 	if err := setup.InitializeConfigDir(); err != nil {
 		// Log the error but don't fail - it's not critical
 		cmd.Printf("Warning: Failed to initialize config directory: %v\n", err)
@@ -329,11 +329,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("%sOK%s\n", ColorGreen, ColorReset)
 
-	// If tenants file is configured, validate it
-	if serveCfg.TenantsFile != "" {
-		if _, err := os.Stat(serveCfg.TenantsFile); err == nil {
-			fmt.Printf("%sTenants file validation%s... ", ColorBlue, ColorReset)
-			if err := validateTenantsFile(serveCfg.TenantsFile); err != nil {
+	// If config file is configured, validate it
+	if serveCfg.ConfigFile != "" {
+		if _, err := os.Stat(serveCfg.ConfigFile); err == nil {
+			fmt.Printf("%sConfig file validation%s... ", ColorBlue, ColorReset)
+			if err := validateConfigFile(serveCfg.ConfigFile); err != nil {
 				fmt.Printf("%sFAILED%s\n", ColorRed, ColorReset)
 				fmt.Printf("%sError:%s %s\n", ColorRed, ColorReset, err.Error())
 				return err
@@ -348,9 +348,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s\n\n", formatMainConfig(serveCfg))
 
 	// Display tenants configuration if available
-	if serveCfg.TenantsFile != "" {
-		if _, err := os.Stat(serveCfg.TenantsFile); err == nil {
-			if tenantsConfig, err := loadTenantsConfig(serveCfg.TenantsFile); err == nil {
+	if serveCfg.ConfigFile != "" {
+		if _, err := os.Stat(serveCfg.ConfigFile); err == nil {
+			if tenantsConfig, err := loadTenantsConfig(serveCfg.ConfigFile); err == nil {
 				fmt.Printf("%s\n\n", formatTenantsConfig(tenantsConfig))
 			}
 		}

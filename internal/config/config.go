@@ -13,7 +13,7 @@ type Config struct {
 	Port             int
 	GlobalDir        string
 	AuthMode         string
-	TenantsFile      string
+	ConfigFile       string
 	InMemory         bool
 	EnableDashboard  bool
 	AutoCreateBucket bool
@@ -49,10 +49,10 @@ func expandTilde(path string) string {
 }
 
 func LoadFromEnv() *Config {
-	// Get default tenants file path
-	defaultTenantsFile := ""
+	// Get default config file path
+	defaultConfigFile := ""
 	if homeDir, err := os.UserHomeDir(); err == nil {
-		defaultTenantsFile = filepath.Join(homeDir, ".config", "s3pit", "tenants.json")
+		defaultConfigFile = filepath.Join(homeDir, ".config", "s3pit", "config.toml")
 	}
 
 	cfg := &Config{
@@ -60,7 +60,7 @@ func LoadFromEnv() *Config {
 		Port:             getEnvAsIntOrDefault("S3PIT_PORT", 3333),
 		GlobalDir:        expandTilde(getEnvOrDefault("S3PIT_GLOBAL_DIRECTORY", "~/s3pit")),
 		AuthMode:         getEnvOrDefault("S3PIT_AUTH_MODE", "sigv4"),
-		TenantsFile:      getEnvOrDefault("S3PIT_TENANTS_FILE", defaultTenantsFile),
+		ConfigFile:       getEnvOrDefault("S3PIT_CONFIG_FILE", defaultConfigFile),
 		InMemory:         getEnvAsBoolOrDefault("S3PIT_IN_MEMORY", false),
 		EnableDashboard:  getEnvAsBoolOrDefault("S3PIT_ENABLE_DASHBOARD", true),
 		AutoCreateBucket: getEnvAsBoolOrDefault("S3PIT_AUTO_CREATE_BUCKET", true),
@@ -166,7 +166,7 @@ func (c *Config) Validate() error {
 		c.GlobalDir = absPath
 	}
 
-	// Note: Credentials are validated from tenants.json file, not from static config
+	// Note: Credentials are validated from config.toml file, not from static config
 
 	return nil
 }

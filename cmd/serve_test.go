@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,11 +16,11 @@ import (
 func TestCmdLineOverrideTracking(t *testing.T) {
 	// Create a temporary directory for test
 	tempDir := t.TempDir()
-	tenantsFile := filepath.Join(tempDir, "tenants.json")
+	configFile := filepath.Join(tempDir, "config.toml")
 
-	// Create test tenants.json
-	tenantsConfig := tenant.TenantsConfig{
-		GlobalDir: tempDir + "/from-tenants",
+	// Create test config.toml
+	tenantsConfig := tenant.Config{
+		GlobalDir: tempDir + "/from-config",
 		Tenants: []tenant.Tenant{
 			{
 				AccessKeyID:     "test-tenant",
@@ -29,10 +29,10 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 		},
 	}
 
-	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
+	configData, err := toml.Marshal(tenantsConfig)
 	require.NoError(t, err)
 
-	err = os.WriteFile(tenantsFile, configData, 0644)
+	err = os.WriteFile(configFile, configData, 0644)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -132,10 +132,10 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 						serveCfg.AuthMode = authMode
 						cmdLineOverrides["auth-mode"] = true
 					}
-					if cmd.Flags().Changed("tenants-file") {
-						tenantsFile, _ := cmd.Flags().GetString("tenants-file")
-						serveCfg.TenantsFile = tenantsFile
-						cmdLineOverrides["tenants-file"] = true
+					if cmd.Flags().Changed("config-file") {
+						configFile, _ := cmd.Flags().GetString("config-file")
+						serveCfg.ConfigFile = configFile
+						cmdLineOverrides["config-file"] = true
 					}
 					if inMemory, _ := cmd.Flags().GetBool("in-memory"); cmd.Flags().Changed("in-memory") {
 						serveCfg.InMemory = inMemory
@@ -195,7 +195,7 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 			cmd.Flags().StringP("host", "H", "0.0.0.0", "Server host")
 			cmd.Flags().String("global-dir", "", "Override global directory path")
 			cmd.Flags().String("auth-mode", "sigv4", "Authentication mode (sigv4 only)")
-			cmd.Flags().String("tenants-file", "", "Path to tenants.json file for multi-tenancy")
+			cmd.Flags().String("config-file", "", "Path to config.toml file for multi-tenancy")
 			cmd.Flags().Bool("in-memory", false, "Use in-memory storage instead of filesystem")
 			cmd.Flags().Bool("dashboard", true, "Enable web dashboard")
 			cmd.Flags().Bool("auto-create-bucket", true, "Automatically create buckets on first upload")
@@ -290,7 +290,7 @@ func TestFlagParsing(t *testing.T) {
 			cmd.Flags().StringP("host", "H", "0.0.0.0", "Server host")
 			cmd.Flags().String("global-dir", "", "Override global directory path")
 			cmd.Flags().String("auth-mode", "sigv4", "Authentication mode")
-			cmd.Flags().String("tenants-file", "", "Path to tenants.json")
+			cmd.Flags().String("config-file", "", "Path to config.toml")
 			cmd.Flags().Bool("in-memory", false, "Use in-memory storage")
 			cmd.Flags().Bool("dashboard", true, "Enable web dashboard")
 			cmd.Flags().Bool("auto-create-bucket", true, "Auto create buckets")

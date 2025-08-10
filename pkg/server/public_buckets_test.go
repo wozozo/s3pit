@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/wozozo/s3pit/internal/config"
@@ -85,9 +85,9 @@ func setupTestServerWithPublicBuckets(t *testing.T) (*Server, string, func()) {
 	tmpDir, err := os.MkdirTemp("", "s3pit-public-test")
 	require.NoError(t, err)
 
-	// Create test tenants.json
-	tenantsFile := filepath.Join(tmpDir, "tenants.json")
-	tenantsConfig := tenant.TenantsConfig{
+	// Create test config.toml
+	configFile := filepath.Join(tmpDir, "config.toml")
+	tenantsConfig := tenant.Config{
 		GlobalDir: tmpDir,
 		Tenants: []tenant.Tenant{
 			{
@@ -107,13 +107,13 @@ func setupTestServerWithPublicBuckets(t *testing.T) (*Server, string, func()) {
 		},
 	}
 
-	data, err := json.Marshal(tenantsConfig)
+	data, err := toml.Marshal(tenantsConfig)
 	require.NoError(t, err)
-	err = os.WriteFile(tenantsFile, data, 0644)
+	err = os.WriteFile(configFile, data, 0644)
 	require.NoError(t, err)
 
 	// Load tenant manager
-	tenantMgr := tenant.NewManager(tenantsFile)
+	tenantMgr := tenant.NewManager(configFile)
 	err = tenantMgr.LoadFromFile()
 	require.NoError(t, err)
 
@@ -131,7 +131,7 @@ func setupTestServerWithPublicBuckets(t *testing.T) (*Server, string, func()) {
 		Port:             3333,
 		GlobalDir:        tmpDir,
 		AuthMode:         "sigv4",
-		TenantsFile:      tenantsFile,
+		ConfigFile:       configFile,
 		InMemory:         false,
 		EnableDashboard:  false,
 		AutoCreateBucket: true,
