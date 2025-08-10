@@ -15,7 +15,7 @@ func TestMultiTenantHandler_ExtractAccessKey(t *testing.T) {
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "test-key",
 		SecretAccessKey: "test-secret",
-		CustomDir: "/test/dir",
+		CustomDir:       "/test/dir",
 	})
 
 	handler := &MultiTenantHandler{
@@ -86,12 +86,12 @@ func TestMultiTenantHandler_AuthenticateSigV4(t *testing.T) {
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "tenant1",
 		SecretAccessKey: "secret1",
-		CustomDir: "/tenant1/data",
+		CustomDir:       "/tenant1/data",
 	})
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "tenant2",
 		SecretAccessKey: "secret2",
-		CustomDir: "/tenant2/data",
+		CustomDir:       "/tenant2/data",
 	})
 
 	handler := &MultiTenantHandler{
@@ -185,7 +185,7 @@ func TestMultiTenantHandler_PresignedURLExpiration(t *testing.T) {
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "test-key",
 		SecretAccessKey: "test-secret",
-		CustomDir: "/test/dir",
+		CustomDir:       "/test/dir",
 	})
 
 	handler := &MultiTenantHandler{

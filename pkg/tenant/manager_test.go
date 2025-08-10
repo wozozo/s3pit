@@ -18,12 +18,12 @@ func TestLoadTenants(t *testing.T) {
 			{
 				AccessKeyID:     "test-key-1",
 				SecretAccessKey: "test-secret-1",
-				CustomDir: "tenant1",
+				CustomDir:       "tenant1",
 			},
 			{
 				AccessKeyID:     "test-key-2",
 				SecretAccessKey: "test-secret-2",
-				CustomDir: "tenant2",
+				CustomDir:       "tenant2",
 			},
 		},
 	}
@@ -72,7 +72,7 @@ func TestGetTenant(t *testing.T) {
 		"existing-key": {
 			AccessKeyID:     "existing-key",
 			SecretAccessKey: "secret",
-			CustomDir: "dir",
+			CustomDir:       "dir",
 		},
 	}
 
@@ -126,7 +126,7 @@ func TestGetDirectory(t *testing.T) {
 		"tenant-key": {
 			AccessKeyID:     "tenant-key",
 			SecretAccessKey: "secret",
-			CustomDir: "custom-dir",
+			CustomDir:       "custom-dir",
 		},
 	}
 

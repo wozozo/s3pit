@@ -163,7 +163,7 @@ func setupTestServerWithPublicBuckets(t *testing.T) (*Server, string, func()) {
 	_, err = publicStorage.CreateBucket("public-bucket")
 	require.NoError(t, err)
 	content := []byte("public content")
-	_, err = publicStorage.PutObject("public-bucket", "test.txt", 
+	_, err = publicStorage.PutObject("public-bucket", "test.txt",
 		bytes.NewReader(content), int64(len(content)), "text/plain")
 	require.NoError(t, err)
 
@@ -277,10 +277,10 @@ func TestPublicBucketWriteRestriction(t *testing.T) {
 	t.Run("PUT request to public bucket WITH auth is also denied", func(t *testing.T) {
 		body := bytes.NewBufferString("new content")
 		req := httptest.NewRequest("PUT", "/public-bucket/new.txt", body)
-		
+
 		// Add authentication as public-tenant
 		signRequestSimple(req, "public-tenant")
-		
+
 		w := httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
 
@@ -312,10 +312,10 @@ func TestNonPublicBucketAccess(t *testing.T) {
 
 	t.Run("GET request to non-public bucket with valid auth succeeds", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/private-bucket/secret.txt", nil)
-		
+
 		// Add authentication header for private-tenant
 		signRequestSimple(req, "private-tenant")
-		
+
 		w := httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
 
@@ -326,21 +326,21 @@ func TestNonPublicBucketAccess(t *testing.T) {
 	t.Run("PUT request to non-public bucket with auth succeeds", func(t *testing.T) {
 		body := bytes.NewBufferString("updated content")
 		req := httptest.NewRequest("PUT", "/private-bucket/new-file.txt", body)
-		
+
 		// Add authentication header for private-tenant
 		signRequestSimple(req, "private-tenant")
-		
+
 		w := httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		
+
 		// Verify the file was created
 		req = httptest.NewRequest("GET", "/private-bucket/new-file.txt", nil)
 		signRequestSimple(req, "private-tenant")
 		w = httptest.NewRecorder()
 		server.router.ServeHTTP(w, req)
-		
+
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.Equal(t, "updated content", w.Body.String())
 	})
@@ -446,7 +446,7 @@ func TestAccessLogging(t *testing.T) {
 
 		// Check response
 		assert.Equal(t, http.StatusOK, resp.Code)
-		
+
 		// Check log contains correct access type
 		logs := logOutput.String()
 		assert.Contains(t, logs, "Type: public")
@@ -468,7 +468,7 @@ func TestAccessLogging(t *testing.T) {
 
 		// Check response
 		assert.Equal(t, http.StatusOK, resp.Code)
-		
+
 		// Check log contains correct access type
 		logs := logOutput.String()
 		assert.Contains(t, logs, "Type: sigv4")
@@ -487,7 +487,7 @@ func TestAccessLogging(t *testing.T) {
 		u, _ := url.Parse(baseURL)
 		q := u.Query()
 		q.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
-		q.Set("X-Amz-Credential", fmt.Sprintf("private-tenant/%s/us-east-1/s3/aws4_request", 
+		q.Set("X-Amz-Credential", fmt.Sprintf("private-tenant/%s/us-east-1/s3/aws4_request",
 			time.Now().UTC().Format("20060102")))
 		q.Set("X-Amz-Date", time.Now().UTC().Format("20060102T150405Z"))
 		q.Set("X-Amz-Expires", "3600")
@@ -502,7 +502,7 @@ func TestAccessLogging(t *testing.T) {
 
 		// Check response
 		assert.Equal(t, http.StatusOK, resp.Code)
-		
+
 		// Check log contains correct access type
 		logs := logOutput.String()
 		assert.Contains(t, logs, "Type: presigned")
@@ -544,10 +544,9 @@ func signRequestSimple(req *http.Request, accessKey string) {
 	now := time.Now().UTC()
 	dateStr := now.Format("20060102T150405Z")
 	req.Header.Set("X-Amz-Date", dateStr)
-	
+
 	credential := fmt.Sprintf("%s/%s/us-east-1/s3/aws4_request", accessKey, now.Format("20060102"))
 	authHeader := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s, SignedHeaders=host;x-amz-date, Signature=test-signature",
 		credential)
 	req.Header.Set("Authorization", authHeader)
 }
-

@@ -21,7 +21,7 @@ func setupTestHandler() (*Handler, *gin.Engine) {
 
 	cfg := &config.Config{
 		Port:             8080,
-		GlobalDir:  "/tmp/test",
+		GlobalDir:        "/tmp/test",
 		AuthMode:         "none",
 		AutoCreateBucket: true,
 	}

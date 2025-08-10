@@ -30,7 +30,7 @@ func setupTestServer(t *testing.T) *Server {
 	cfg := &config.Config{
 		Port:             3333,
 		Host:             "localhost",
-		GlobalDir:  t.TempDir(),
+		GlobalDir:        t.TempDir(),
 		InMemory:         true,
 		AutoCreateBucket: true,
 		AuthMode:         "sigv4",

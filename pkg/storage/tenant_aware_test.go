@@ -37,12 +37,12 @@ func TestTenantAwareStorage_GetStorageForTenant(t *testing.T) {
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "tenant1",
 		SecretAccessKey: "secret1",
-		CustomDir: tenant1Dir,
+		CustomDir:       tenant1Dir,
 	})
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "tenant2",
 		SecretAccessKey: "secret2",
-		CustomDir: tenant2Dir,
+		CustomDir:       tenant2Dir,
 	})
 
 	// Create tenant-aware storage
@@ -110,12 +110,12 @@ func TestTenantAwareStorage_Isolation(t *testing.T) {
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "tenant1",
 		SecretAccessKey: "secret1",
-		CustomDir: tenant1Dir,
+		CustomDir:       tenant1Dir,
 	})
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "tenant2",
 		SecretAccessKey: "secret2",
-		CustomDir: tenant2Dir,
+		CustomDir:       tenant2Dir,
 	})
 
 	// Create tenant-aware storage
@@ -198,7 +198,7 @@ func TestTenantAwareStorage_Concurrency(t *testing.T) {
 		_ = tenantManager.AddTenant(&tenant.Tenant{
 			AccessKeyID:     tenantID,
 			SecretAccessKey: fmt.Sprintf("secret%d", i),
-			CustomDir: dir,
+			CustomDir:       dir,
 		})
 	}
 
@@ -301,7 +301,7 @@ func TestTenantAwareStorage_TildeExpansion(t *testing.T) {
 	_ = tenantManager.AddTenant(&tenant.Tenant{
 		AccessKeyID:     "tilde-tenant",
 		SecretAccessKey: "secret",
-		CustomDir: "~/.s3pit-test",
+		CustomDir:       "~/.s3pit-test",
 	})
 
 	// Note: The actual tilde expansion happens in tenant.Manager
