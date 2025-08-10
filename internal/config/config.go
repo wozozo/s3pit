@@ -11,7 +11,7 @@ import (
 type Config struct {
 	Host             string
 	Port             int
-	GlobalDir  string
+	GlobalDir        string
 	AuthMode         string
 	TenantsFile      string
 	InMemory         bool
@@ -51,14 +51,14 @@ func LoadFromEnv() *Config {
 	cfg := &Config{
 		Host:             getEnvOrDefault("S3PIT_HOST", "0.0.0.0"),
 		Port:             getEnvAsIntOrDefault("S3PIT_PORT", 3333),
-		GlobalDir:  expandTilde(getEnvOrDefault("S3PIT_GLOBAL_DIRECTORY", "~/s3pit")),
+		GlobalDir:        expandTilde(getEnvOrDefault("S3PIT_GLOBAL_DIRECTORY", "~/s3pit")),
 		AuthMode:         getEnvOrDefault("S3PIT_AUTH_MODE", "sigv4"),
 		TenantsFile:      getEnvOrDefault("S3PIT_TENANTS_FILE", defaultTenantsFile),
 		InMemory:         getEnvAsBoolOrDefault("S3PIT_IN_MEMORY", false),
 		EnableDashboard:  getEnvAsBoolOrDefault("S3PIT_ENABLE_DASHBOARD", true),
 		AutoCreateBucket: getEnvAsBoolOrDefault("S3PIT_AUTO_CREATE_BUCKET", true),
-		AccessKeyID:      getEnvOrDefault("S3PIT_ACCESS_KEY_ID", "minioadmin"),
-		SecretAccessKey:  getEnvOrDefault("S3PIT_SECRET_ACCESS_KEY", "minioadmin"),
+		AccessKeyID:      getEnvOrDefault("S3PIT_ACCESS_KEY_ID", "s3pitadmin"),
+		SecretAccessKey:  getEnvOrDefault("S3PIT_SECRET_ACCESS_KEY", "s3pitadmin"),
 		Region:           getEnvOrDefault("S3PIT_REGION", "us-east-1"),
 		LogLevel:         getEnvOrDefault("S3PIT_LOG_LEVEL", "info"),
 		LogDir:           getEnvOrDefault("S3PIT_LOG_DIR", "./logs"),

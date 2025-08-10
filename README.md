@@ -359,8 +359,8 @@ Options:
   --auth-mode string          Authentication mode: sigv4
   --in-memory                 Use in-memory storage
   --auto-create-bucket        Auto-create buckets on upload (default true)
-  --access-key-id string      Access key for static auth (default "minioadmin")
-  --secret-access-key string  Secret key for static auth (default "minioadmin")
+  --access-key-id string      Access key for static auth (default "s3pitadmin")
+  --secret-access-key string  Secret key for static auth (default "s3pitadmin")
   --log-level string          Log level: debug|info|warn|error (default "info")
   --log-dir string            Directory for log files (default "./logs")
   --no-dashboard              Disable web dashboard
@@ -381,8 +381,8 @@ All command-line options can be configured via environment variables with the `S
 | `S3PIT_AUTH_MODE` | string | | Authentication mode:<br>• `sigv4`: Full AWS Signature V4 validation |
 | `S3PIT_IN_MEMORY` | bool | false | Store all data in memory (lost on restart) |
 | `S3PIT_AUTO_CREATE_BUCKET` | bool | true | Auto-create buckets on first upload |
-| `S3PIT_ACCESS_KEY_ID` | string | "minioadmin" | Access key for authentication |
-| `S3PIT_SECRET_ACCESS_KEY` | string | "minioadmin" | Secret key for authentication |
+| `S3PIT_ACCESS_KEY_ID` | string | "s3pitadmin" | Access key for authentication |
+| `S3PIT_SECRET_ACCESS_KEY` | string | "s3pitadmin" | Secret key for authentication |
 | `S3PIT_LOG_LEVEL` | string | "info" | Minimum log level: debug, info, warn, error |
 | `S3PIT_LOG_DIR` | string | "./logs" | Directory for log files |
 | `S3PIT_ENABLE_FILE_LOG` | bool | true | Write logs to files |
@@ -670,8 +670,8 @@ const config = {
   s3: {
     endpoint: process.env.S3_ENDPOINT || 'http://localhost:3333',
     credentials: {
-      accessKeyId: 'minioadmin',
-      secretAccessKey: 'minioadmin'
+      accessKeyId: 's3pitadmin',
+      secretAccessKey: 's3pitadmin'
     },
     forcePathStyle: true
   }
