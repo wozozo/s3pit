@@ -104,7 +104,8 @@ func (s *Server) setupRoutes() {
 	s.router.Use(logger.S3APILoggingMiddleware())
 	s.router.Use(dashboard.LoggingMiddleware())
 	s.router.Use(s.corsMiddleware())
-	s.router.Use(s.authMiddleware()) // Add authentication middleware
+	s.router.Use(s.delayMiddleware()) // Add delay middleware before auth
+	s.router.Use(s.authMiddleware())  // Add authentication middleware
 
 	// Setup dashboard routes BEFORE S3 API routes to avoid conflicts
 	if s.config.EnableDashboard {
@@ -207,6 +208,11 @@ func (s *Server) setupDashboard() {
 		region,
 	)
 	dashboardHandler.RegisterRoutes(s.router)
+}
+
+// GetConfig returns the server configuration
+func (s *Server) GetConfig() *config.Config {
+	return s.config
 }
 
 func (s *Server) Start() error {

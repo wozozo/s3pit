@@ -51,6 +51,14 @@ func init() {
 	serveCmd.Flags().String("log-dir", "./logs", "Directory for log files")
 	serveCmd.Flags().Bool("no-dashboard", false, "Disable web dashboard")
 	serveCmd.Flags().Int64("max-object-size", 5368709120, "Maximum object size in bytes")
+
+	// Delay configuration flags
+	serveCmd.Flags().Int("read-delay-ms", 0, "Fixed delay for read operations in milliseconds")
+	serveCmd.Flags().Int("read-delay-random-min", 0, "Minimum random delay for read operations in milliseconds")
+	serveCmd.Flags().Int("read-delay-random-max", 0, "Maximum random delay for read operations in milliseconds")
+	serveCmd.Flags().Int("write-delay-ms", 0, "Fixed delay for write operations in milliseconds")
+	serveCmd.Flags().Int("write-delay-random-min", 0, "Minimum random delay for write operations in milliseconds")
+	serveCmd.Flags().Int("write-delay-random-max", 0, "Maximum random delay for write operations in milliseconds")
 }
 
 // formatMainConfig formats the main configuration for display
@@ -103,6 +111,42 @@ func formatMainConfig(cfg *config.Config) string {
 	parts = append(parts, fmt.Sprintf("  %sDirectory:%s %s%s%s", ColorBlue, ColorReset, ColorDim, cfg.LogDir, ColorReset))
 	parts = append(parts, fmt.Sprintf("  %sFile Logging:%s %s%v%s", ColorBlue, ColorReset, ColorWhite, cfg.EnableFileLog, ColorReset))
 	parts = append(parts, fmt.Sprintf("  %sConsole Logging:%s %s%v%s", ColorBlue, ColorReset, ColorWhite, cfg.EnableConsoleLog, ColorReset))
+	parts = append(parts, "")
+
+	// Delay Configuration
+	parts = append(parts, fmt.Sprintf("%s%sDelay Configuration:%s", ColorBold, ColorGreen, ColorReset))
+	
+	// Read delays
+	if cfg.ReadDelayMs > 0 {
+		parts = append(parts, fmt.Sprintf("  %sRead Delay:%s %s%dms (fixed)%s", ColorBlue, ColorReset, ColorYellow, cfg.ReadDelayMs, ColorReset))
+	} else if cfg.ReadDelayRandomMin > 0 && cfg.ReadDelayRandomMax > 0 {
+		parts = append(parts, fmt.Sprintf("  %sRead Delay:%s %s%d-%dms (random)%s", ColorBlue, ColorReset, ColorYellow, cfg.ReadDelayRandomMin, cfg.ReadDelayRandomMax, ColorReset))
+	} else {
+		parts = append(parts, fmt.Sprintf("  %sRead Delay:%s %sNone%s", ColorBlue, ColorReset, ColorDim, ColorReset))
+	}
+
+	// Write delays
+	if cfg.WriteDelayMs > 0 {
+		parts = append(parts, fmt.Sprintf("  %sWrite Delay:%s %s%dms (fixed)%s", ColorBlue, ColorReset, ColorYellow, cfg.WriteDelayMs, ColorReset))
+	} else if cfg.WriteDelayRandomMin > 0 && cfg.WriteDelayRandomMax > 0 {
+		parts = append(parts, fmt.Sprintf("  %sWrite Delay:%s %s%d-%dms (random)%s", ColorBlue, ColorReset, ColorYellow, cfg.WriteDelayRandomMin, cfg.WriteDelayRandomMax, ColorReset))
+	} else {
+		parts = append(parts, fmt.Sprintf("  %sWrite Delay:%s %sNone%s", ColorBlue, ColorReset, ColorDim, ColorReset))
+	}
+	parts = append(parts, "")
+
+	// Available Options
+	parts = append(parts, fmt.Sprintf("%s%sConfigurable Options:%s", ColorBold, ColorGreen, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--read-delay-ms:%s Fixed delay for read operations (ms)", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--read-delay-random-min/max:%s Random delay range for reads", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--write-delay-ms:%s Fixed delay for write operations (ms)", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--write-delay-random-min/max:%s Random delay range for writes", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--port:%s Server port (default: 3333)", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--host:%s Server host (default: 0.0.0.0)", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--global-dir:%s Storage directory", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--auth-mode:%s Authentication mode (sigv4)", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--in-memory:%s Use in-memory storage", ColorBlue, ColorReset))
+	parts = append(parts, fmt.Sprintf("  %s--auto-create-bucket:%s Auto-create buckets on upload", ColorBlue, ColorReset))
 
 	return strings.Join(parts, "\n")
 }
@@ -235,6 +279,32 @@ func runServe(cmd *cobra.Command, args []string) error {
 	if maxObjectSize, _ := cmd.Flags().GetInt64("max-object-size"); cmd.Flags().Changed("max-object-size") {
 		serveCfg.MaxObjectSize = maxObjectSize
 		cmdLineOverrides["max-object-size"] = true
+	}
+
+	// Delay configuration flags
+	if readDelayMs, _ := cmd.Flags().GetInt("read-delay-ms"); cmd.Flags().Changed("read-delay-ms") {
+		serveCfg.ReadDelayMs = readDelayMs
+		cmdLineOverrides["read-delay-ms"] = true
+	}
+	if readDelayMin, _ := cmd.Flags().GetInt("read-delay-random-min"); cmd.Flags().Changed("read-delay-random-min") {
+		serveCfg.ReadDelayRandomMin = readDelayMin
+		cmdLineOverrides["read-delay-random-min"] = true
+	}
+	if readDelayMax, _ := cmd.Flags().GetInt("read-delay-random-max"); cmd.Flags().Changed("read-delay-random-max") {
+		serveCfg.ReadDelayRandomMax = readDelayMax
+		cmdLineOverrides["read-delay-random-max"] = true
+	}
+	if writeDelayMs, _ := cmd.Flags().GetInt("write-delay-ms"); cmd.Flags().Changed("write-delay-ms") {
+		serveCfg.WriteDelayMs = writeDelayMs
+		cmdLineOverrides["write-delay-ms"] = true
+	}
+	if writeDelayMin, _ := cmd.Flags().GetInt("write-delay-random-min"); cmd.Flags().Changed("write-delay-random-min") {
+		serveCfg.WriteDelayRandomMin = writeDelayMin
+		cmdLineOverrides["write-delay-random-min"] = true
+	}
+	if writeDelayMax, _ := cmd.Flags().GetInt("write-delay-random-max"); cmd.Flags().Changed("write-delay-random-max") {
+		serveCfg.WriteDelayRandomMax = writeDelayMax
+		cmdLineOverrides["write-delay-random-max"] = true
 	}
 
 	// Initialize config directory and default tenants.json if needed

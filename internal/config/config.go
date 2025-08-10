@@ -25,6 +25,16 @@ type Config struct {
 	LogRotationSize  int64
 	MaxLogEntries    int
 	MaxObjectSize    int64
+
+	// Delay configuration for read operations
+	ReadDelayMs        int // Fixed delay in milliseconds (0 = disabled)
+	ReadDelayRandomMin int // Min delay for random mode (milliseconds)
+	ReadDelayRandomMax int // Max delay for random mode (milliseconds)
+
+	// Delay configuration for write operations
+	WriteDelayMs        int // Fixed delay in milliseconds (0 = disabled)
+	WriteDelayRandomMin int // Min delay for random mode (milliseconds)
+	WriteDelayRandomMax int // Max delay for random mode (milliseconds)
 }
 
 // expandTilde expands the tilde (~) in a path to the user's home directory
@@ -62,6 +72,16 @@ func LoadFromEnv() *Config {
 		LogRotationSize:  getEnvAsInt64OrDefault("S3PIT_LOG_ROTATION_SIZE", 100*1024*1024), // 100MB default
 		MaxLogEntries:    getEnvAsIntOrDefault("S3PIT_MAX_LOG_ENTRIES", 10000),
 		MaxObjectSize:    getEnvAsInt64OrDefault("S3PIT_MAX_OBJECT_SIZE", 5*1024*1024*1024), // 5GB default
+
+		// Read delay configuration
+		ReadDelayMs:        getEnvAsIntOrDefault("S3PIT_READ_DELAY_MS", 0),
+		ReadDelayRandomMin: getEnvAsIntOrDefault("S3PIT_READ_DELAY_RANDOM_MIN_MS", 0),
+		ReadDelayRandomMax: getEnvAsIntOrDefault("S3PIT_READ_DELAY_RANDOM_MAX_MS", 0),
+
+		// Write delay configuration
+		WriteDelayMs:        getEnvAsIntOrDefault("S3PIT_WRITE_DELAY_MS", 0),
+		WriteDelayRandomMin: getEnvAsIntOrDefault("S3PIT_WRITE_DELAY_RANDOM_MIN_MS", 0),
+		WriteDelayRandomMax: getEnvAsIntOrDefault("S3PIT_WRITE_DELAY_RANDOM_MAX_MS", 0),
 	}
 
 	return cfg

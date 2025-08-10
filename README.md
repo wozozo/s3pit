@@ -365,6 +365,12 @@ Options:
   --log-dir string            Directory for log files (default "./logs")
   --no-dashboard              Disable web dashboard
   --max-object-size int       Maximum object size in bytes (default 5368709120)
+  --read-delay-ms int         Fixed delay for read operations in milliseconds
+  --read-delay-random-min int Minimum random delay for read operations in milliseconds
+  --read-delay-random-max int Maximum random delay for read operations in milliseconds
+  --write-delay-ms int        Fixed delay for write operations in milliseconds
+  --write-delay-random-min int Minimum random delay for write operations in milliseconds
+  --write-delay-random-max int Maximum random delay for write operations in milliseconds
 ```
 
 ### Environment Variables
@@ -388,6 +394,12 @@ All command-line options can be configured via environment variables with the `S
 | `S3PIT_MAX_OBJECT_SIZE` | int | 5368709120 | Max object size in bytes (default 5GB) |
 | `S3PIT_ENABLE_DASHBOARD` | bool | true | Enable web dashboard at /dashboard |
 | `S3PIT_TENANTS_FILE` | string | "~/.config/s3pit/tenants.json" | Path to tenants.json for multi-tenancy (auto-created) |
+| `S3PIT_READ_DELAY_MS` | int | 0 | Fixed delay for read operations in milliseconds |
+| `S3PIT_READ_DELAY_RANDOM_MIN_MS` | int | 0 | Minimum random delay for read operations in milliseconds |
+| `S3PIT_READ_DELAY_RANDOM_MAX_MS` | int | 0 | Maximum random delay for read operations in milliseconds |
+| `S3PIT_WRITE_DELAY_MS` | int | 0 | Fixed delay for write operations in milliseconds |
+| `S3PIT_WRITE_DELAY_RANDOM_MIN_MS` | int | 0 | Minimum random delay for write operations in milliseconds |
+| `S3PIT_WRITE_DELAY_RANDOM_MAX_MS` | int | 0 | Maximum random delay for write operations in milliseconds |
 
 ### Configuration Examples
 
@@ -852,6 +864,50 @@ export S3PIT_IN_MEMORY=true  # Keep all data in memory
 # For large file workloads
 export S3PIT_MAX_OBJECT_SIZE=10737418240  # 10GB
 ```
+
+### Response Delay Simulation
+
+S3pit supports simulating network latency for testing application behavior under various conditions. You can configure separate delays for read and write operations, using either fixed or random delays.
+
+#### Delay Configuration
+
+**Fixed Delays** - Apply a consistent delay to all operations:
+```bash
+# Fixed 500ms delay for reads, 1000ms for writes
+s3pit serve --read-delay-ms 500 --write-delay-ms 1000
+
+# Using environment variables
+export S3PIT_READ_DELAY_MS=200
+export S3PIT_WRITE_DELAY_MS=800
+s3pit serve
+```
+
+**Random Delays** - Apply varying delays within a specified range:
+```bash
+# Random delay between 100-500ms for reads, 500-1500ms for writes
+s3pit serve --read-delay-random-min 100 --read-delay-random-max 500 \
+           --write-delay-random-min 500 --write-delay-random-max 1500
+
+# Using environment variables
+export S3PIT_READ_DELAY_RANDOM_MIN_MS=100
+export S3PIT_READ_DELAY_RANDOM_MAX_MS=500
+export S3PIT_WRITE_DELAY_RANDOM_MIN_MS=500
+export S3PIT_WRITE_DELAY_RANDOM_MAX_MS=1500
+s3pit serve
+```
+
+#### Operation Classification
+
+- **Read Operations**: GET, HEAD requests (ListBuckets, HeadBucket, ListObjectsV2, HeadObject, GetObject)
+- **Write Operations**: PUT, DELETE, POST requests (CreateBucket, DeleteBucket, PutObject, DeleteObject, CopyObject, multipart operations)
+
+#### Use Cases
+
+This feature is useful for:
+- Testing application resilience under slow network conditions
+- Simulating realistic cloud latency in local development
+- Identifying timeout issues in client applications
+- Performance testing with variable response times
 
 ## Debug Mode
 
