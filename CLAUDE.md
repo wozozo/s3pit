@@ -38,7 +38,7 @@ make clean
 make run
 
 # Run with custom options
-./s3pit serve --port 3333 --data-dir ./data
+./s3pit serve --port 3333 --global-directory ./data
 
 ```
 
@@ -91,7 +91,7 @@ make run
 
 Environment variables are loaded in `internal/config/config.go`. Key variables:
 - `S3PIT_PORT`: Server port (default: 3333)
-- `S3PIT_DATA_DIR`: Storage directory (default: ./data)
+- `S3PIT_GLOBAL_DIRECTORY`: Storage directory (default: ~/s3pit)
 - `S3PIT_AUTH_MODE`: Authentication mode
 - `S3PIT_IN_MEMORY`: Use memory storage instead of filesystem
 - `S3PIT_AUTO_CREATE_BUCKET`: Enable auto-create (default: true)

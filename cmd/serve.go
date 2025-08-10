@@ -23,7 +23,7 @@ func init() {
 	// Add server-specific flags
 	serveCmd.Flags().IntP("port", "p", 3333, "Server port")
 	serveCmd.Flags().StringP("host", "H", "0.0.0.0", "Server host")
-	serveCmd.Flags().String("data-dir", "./data", "Data directory path")
+	serveCmd.Flags().String("global-directory", "", "Override global directory path")
 	serveCmd.Flags().String("auth-mode", "sigv4", "Authentication mode (sigv4 only)")
 	serveCmd.Flags().String("tenants-file", "", "Path to tenants.json file for multi-tenancy")
 	serveCmd.Flags().Bool("in-memory", false, "Use in-memory storage instead of filesystem")
@@ -42,8 +42,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 	if host, _ := cmd.Flags().GetString("host"); cmd.Flags().Changed("host") {
 		serveCfg.Host = host
 	}
-	if dataDir, _ := cmd.Flags().GetString("data-dir"); cmd.Flags().Changed("data-dir") {
-		serveCfg.DataDir = dataDir
+	if globalDirectory, _ := cmd.Flags().GetString("global-directory"); cmd.Flags().Changed("global-directory") {
+		serveCfg.GlobalDirectory = globalDirectory
 	}
 	if authMode, _ := cmd.Flags().GetString("auth-mode"); cmd.Flags().Changed("auth-mode") {
 		serveCfg.AuthMode = authMode

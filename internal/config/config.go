@@ -11,7 +11,7 @@ import (
 type Config struct {
 	Host             string
 	Port             int
-	DataDir          string
+	GlobalDirectory  string
 	AuthMode         string
 	TenantsFile      string
 	InMemory         bool
@@ -51,7 +51,7 @@ func LoadFromEnv() *Config {
 	cfg := &Config{
 		Host:             getEnvOrDefault("S3PIT_HOST", "0.0.0.0"),
 		Port:             getEnvAsIntOrDefault("S3PIT_PORT", 3333),
-		DataDir:          expandTilde(getEnvOrDefault("S3PIT_DATA_DIR", "~/s3pit")),
+		GlobalDirectory:  expandTilde(getEnvOrDefault("S3PIT_GLOBAL_DIRECTORY", "~/s3pit")),
 		AuthMode:         getEnvOrDefault("S3PIT_AUTH_MODE", "sigv4"),
 		TenantsFile:      getEnvOrDefault("S3PIT_TENANTS_FILE", defaultTenantsFile),
 		InMemory:         getEnvAsBoolOrDefault("S3PIT_IN_MEMORY", false),
@@ -73,14 +73,14 @@ func LoadFromEnv() *Config {
 	return cfg
 }
 
-// UpdateDataDirFromTenants updates the DataDir from tenant configuration if available
-func (c *Config) UpdateDataDirFromTenants(tenantManager interface{}) {
+// UpdateGlobalDirectoryFromTenants updates the GlobalDirectory from tenant configuration if available
+func (c *Config) UpdateGlobalDirectoryFromTenants(tenantManager interface{}) {
 	// Use reflection-like interface to avoid circular dependency
 	if tm, ok := tenantManager.(interface {
 		GetGlobalDirectory() string
 	}); ok {
 		if globalDirectory := tm.GetGlobalDirectory(); globalDirectory != "" {
-			c.DataDir = globalDirectory
+			c.GlobalDirectory = globalDirectory
 		}
 	}
 }
@@ -138,13 +138,13 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid log level: %s, must be one of: %s", c.LogLevel, strings.Join(validLogLevels, ", "))
 	}
 
-	// Validate data directory if not in-memory
+	// Validate global directory if not in-memory
 	if !c.InMemory {
-		absPath, err := filepath.Abs(c.DataDir)
+		absPath, err := filepath.Abs(c.GlobalDirectory)
 		if err != nil {
-			return fmt.Errorf("invalid data directory: %w", err)
+			return fmt.Errorf("invalid global directory: %w", err)
 		}
-		c.DataDir = absPath
+		c.GlobalDirectory = absPath
 	}
 
 	// Validate credentials for authentication
@@ -169,7 +169,7 @@ func contains(slice []string, item string) bool {
 // String returns a string representation of the configuration
 func (c *Config) String() string {
 	return fmt.Sprintf(
-		"Host: %s\nPort: %d\nAuth Mode: %s\nData Dir: %s\nIn Memory: %v\nDashboard: %v\nAuto Create Bucket: %v\nLog Level: %s\nMax Object Size: %d\nMax Buckets: %d",
-		c.Host, c.Port, c.AuthMode, c.DataDir, c.InMemory, c.EnableDashboard, c.AutoCreateBucket, c.LogLevel, c.MaxObjectSize, c.MaxBuckets,
+		"Host: %s\nPort: %d\nAuth Mode: %s\nGlobal Dir: %s\nIn Memory: %v\nDashboard: %v\nAuto Create Bucket: %v\nLog Level: %s\nMax Object Size: %d\nMax Buckets: %d",
+		c.Host, c.Port, c.AuthMode, c.GlobalDirectory, c.InMemory, c.EnableDashboard, c.AutoCreateBucket, c.LogLevel, c.MaxObjectSize, c.MaxBuckets,
 	)
 }

@@ -22,7 +22,7 @@ func init() {
 
 	rootCmd.PersistentFlags().IntP("port", "p", 3333, "Server port")
 	rootCmd.PersistentFlags().StringP("host", "H", "0.0.0.0", "Server host")
-	rootCmd.PersistentFlags().String("data-dir", "./data", "Data directory path")
+
 	rootCmd.PersistentFlags().String("auth-mode", "sigv4", "Authentication mode (sigv4 only)")
 	rootCmd.PersistentFlags().String("tenants-file", "", "Path to tenants.json file for multi-tenancy")
 	rootCmd.PersistentFlags().Bool("in-memory", false, "Use in-memory storage instead of filesystem")
@@ -39,9 +39,7 @@ func initConfig() {
 	if host, _ := rootCmd.Flags().GetString("host"); rootCmd.Flags().Changed("host") {
 		cfg.Host = host
 	}
-	if dataDir, _ := rootCmd.Flags().GetString("data-dir"); rootCmd.Flags().Changed("data-dir") {
-		cfg.DataDir = dataDir
-	}
+
 	if authMode, _ := rootCmd.Flags().GetString("auth-mode"); rootCmd.Flags().Changed("auth-mode") {
 		cfg.AuthMode = authMode
 	}
