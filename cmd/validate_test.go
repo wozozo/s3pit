@@ -15,12 +15,12 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "valid configuration",
 			content: `{
-				"globalDirectory": "~/s3pit",
+				"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
 						"secretAccessKey": "test_secret_key",
-						"customDirectory": "/tmp/test",
+						"customDir": "/tmp/test",
 						"description": "Test tenant"
 					}
 				]
@@ -30,18 +30,18 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "multiple valid tenants",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TENANT1_KEY",
 						"secretAccessKey": "tenant1_secret",
-						"customDirectory": "/tmp/tenant1",
+						"customDir": "/tmp/tenant1",
 						"description": "Tenant 1"
 					},
 					{
 						"accessKeyId": "TENANT2_KEY",
 						"secretAccessKey": "tenant2_secret",
-						"customDirectory": "/tmp/tenant2",
+						"customDir": "/tmp/tenant2",
 						"description": "Tenant 2"
 					}
 				]
@@ -55,7 +55,7 @@ func TestValidateTenantsFile(t *testing.T) {
 					{
 						"accessKeyId": "TEST_KEY",
 						"secretAccessKey": "test_secret"
-						"customDirectory": "/tmp/test"
+						"customDir": "/tmp/test"
 					}
 				]
 			}`,
@@ -73,11 +73,11 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "missing accessKeyId",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"secretAccessKey": "test_secret",
-						"customDirectory": "/tmp/test"
+						"customDir": "/tmp/test"
 					}
 				]
 			}`,
@@ -87,12 +87,12 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "empty accessKeyId",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "",
 						"secretAccessKey": "test_secret",
-						"customDirectory": "/tmp/test"
+						"customDir": "/tmp/test"
 					}
 				]
 			}`,
@@ -102,11 +102,11 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "missing secretAccessKey",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
-						"customDirectory": "/tmp/test"
+						"customDir": "/tmp/test"
 					}
 				]
 			}`,
@@ -116,12 +116,12 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "empty secretAccessKey",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
 						"secretAccessKey": "",
-						"customDirectory": "/tmp/test"
+						"customDir": "/tmp/test"
 					}
 				]
 			}`,
@@ -139,12 +139,12 @@ func TestValidateTenantsFile(t *testing.T) {
 				]
 			}`,
 			expectError: true,
-			errorMsg:    "global globalDirectory is required",
+			errorMsg:    "global globalDir is required",
 		},
 		{
 			name: "missing directory with global dataDir (valid)",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
@@ -157,12 +157,12 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "empty directory with global dataDir (valid)",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
 						"secretAccessKey": "test_secret",
-						"customDirectory": ""
+						"customDir": ""
 					}
 				]
 			}`,
@@ -171,7 +171,7 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "invalid global dataDir path",
 			content: `{
-		"globalDirectory": "relative/path",
+		"globalDir": "relative/path",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
@@ -180,17 +180,17 @@ func TestValidateTenantsFile(t *testing.T) {
 				]
 			}`,
 			expectError: true,
-			errorMsg:    "global globalDirectory must be an absolute path",
+			errorMsg:    "global globalDir must be an absolute path",
 		},
 		{
 			name: "invalid accessKeyId characters",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "INVALID@KEY",
 						"secretAccessKey": "test_secret",
-						"customDirectory": "/tmp/test"
+						"customDir": "/tmp/test"
 					}
 				]
 			}`,
@@ -200,12 +200,12 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "valid with tilde directory",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
 						"secretAccessKey": "test_secret",
-						"customDirectory": "~/test_data"
+						"customDir": "~/test_data"
 					}
 				]
 			}`,
@@ -214,32 +214,32 @@ func TestValidateTenantsFile(t *testing.T) {
 		{
 			name: "invalid relative directory path",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
 						"secretAccessKey": "test_secret",
-						"customDirectory": "relative/path"
+						"customDir": "relative/path"
 					}
 				]
 			}`,
 			expectError: true,
-			errorMsg:    "customDirectory must be an absolute path",
+			errorMsg:    "customDir must be an absolute path",
 		},
 		{
 			name: "invalid relative directory (single dir)",
 			content: `{
-		"globalDirectory": "~/s3pit",
+		"globalDir": "~/s3pit",
 				"tenants": [
 					{
 						"accessKeyId": "TEST_KEY",
 						"secretAccessKey": "test_secret",
-						"customDirectory": "data"
+						"customDir": "data"
 					}
 				]
 			}`,
 			expectError: true,
-			errorMsg:    "customDirectory must be an absolute path",
+			errorMsg:    "customDir must be an absolute path",
 		},
 	}
 

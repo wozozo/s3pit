@@ -36,7 +36,7 @@ func InitializeConfigDir() error {
 
 	// Create default tenants configuration
 	defaultConfig := tenant.TenantsConfig{
-		GlobalDirectory: "~/s3pit/data",
+		GlobalDir: "~/s3pit/data",
 		Tenants: []tenant.Tenant{
 			{
 				AccessKeyID:     "test-key",

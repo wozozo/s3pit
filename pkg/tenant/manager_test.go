@@ -18,12 +18,12 @@ func TestLoadTenants(t *testing.T) {
 			{
 				AccessKeyID:     "test-key-1",
 				SecretAccessKey: "test-secret-1",
-				CustomDirectory: "tenant1",
+				CustomDir: "tenant1",
 			},
 			{
 				AccessKeyID:     "test-key-2",
 				SecretAccessKey: "test-secret-2",
-				CustomDirectory: "tenant2",
+				CustomDir: "tenant2",
 			},
 		},
 	}
@@ -58,8 +58,8 @@ func TestLoadTenants(t *testing.T) {
 		if tenant1.SecretAccessKey != "test-secret-1" {
 			t.Errorf("Expected secret key 'test-secret-1', got %s", tenant1.SecretAccessKey)
 		}
-		if tenant1.CustomDirectory != "tenant1" {
-			t.Errorf("Expected directory 'tenant1', got %s", tenant1.CustomDirectory)
+		if tenant1.CustomDir != "tenant1" {
+			t.Errorf("Expected directory 'tenant1', got %s", tenant1.CustomDir)
 		}
 	}
 }
@@ -72,7 +72,7 @@ func TestGetTenant(t *testing.T) {
 		"existing-key": {
 			AccessKeyID:     "existing-key",
 			SecretAccessKey: "secret",
-			CustomDirectory: "dir",
+			CustomDir: "dir",
 		},
 	}
 
@@ -100,9 +100,9 @@ func TestGetAllTenants(t *testing.T) {
 
 	// Add test tenants
 	manager.tenants = map[string]*Tenant{
-		"key1": {AccessKeyID: "key1", SecretAccessKey: "secret1", CustomDirectory: "dir1"},
-		"key2": {AccessKeyID: "key2", SecretAccessKey: "secret2", CustomDirectory: "dir2"},
-		"key3": {AccessKeyID: "key3", SecretAccessKey: "secret3", CustomDirectory: "dir3"},
+		"key1": {AccessKeyID: "key1", SecretAccessKey: "secret1", CustomDir: "dir1"},
+		"key2": {AccessKeyID: "key2", SecretAccessKey: "secret2", CustomDir: "dir2"},
+		"key3": {AccessKeyID: "key3", SecretAccessKey: "secret3", CustomDir: "dir3"},
 	}
 
 	allTenants := manager.GetAllTenants()
@@ -126,7 +126,7 @@ func TestGetDirectory(t *testing.T) {
 		"tenant-key": {
 			AccessKeyID:     "tenant-key",
 			SecretAccessKey: "secret",
-			CustomDirectory: "custom-dir",
+			CustomDir: "custom-dir",
 		},
 	}
 
@@ -187,7 +187,7 @@ func TestLoadNonExistentFile(t *testing.T) {
 func TestConcurrentAccess(t *testing.T) {
 	manager := NewManager("")
 	manager.tenants = map[string]*Tenant{
-		"key1": {AccessKeyID: "key1", SecretAccessKey: "secret1", CustomDirectory: "dir1"},
+		"key1": {AccessKeyID: "key1", SecretAccessKey: "secret1", CustomDir: "dir1"},
 	}
 
 	// Test concurrent reads

@@ -11,7 +11,7 @@ import (
 type Config struct {
 	Host             string
 	Port             int
-	GlobalDirectory  string
+	GlobalDir  string
 	AuthMode         string
 	TenantsFile      string
 	InMemory         bool
@@ -51,7 +51,7 @@ func LoadFromEnv() *Config {
 	cfg := &Config{
 		Host:             getEnvOrDefault("S3PIT_HOST", "0.0.0.0"),
 		Port:             getEnvAsIntOrDefault("S3PIT_PORT", 3333),
-		GlobalDirectory:  expandTilde(getEnvOrDefault("S3PIT_GLOBAL_DIRECTORY", "~/s3pit")),
+		GlobalDir:  expandTilde(getEnvOrDefault("S3PIT_GLOBAL_DIRECTORY", "~/s3pit")),
 		AuthMode:         getEnvOrDefault("S3PIT_AUTH_MODE", "sigv4"),
 		TenantsFile:      getEnvOrDefault("S3PIT_TENANTS_FILE", defaultTenantsFile),
 		InMemory:         getEnvAsBoolOrDefault("S3PIT_IN_MEMORY", false),
@@ -73,14 +73,14 @@ func LoadFromEnv() *Config {
 	return cfg
 }
 
-// UpdateGlobalDirectoryFromTenants updates the GlobalDirectory from tenant configuration if available
-func (c *Config) UpdateGlobalDirectoryFromTenants(tenantManager interface{}) {
+// UpdateGlobalDirFromTenants updates the GlobalDir from tenant configuration if available
+func (c *Config) UpdateGlobalDirFromTenants(tenantManager interface{}) {
 	// Use reflection-like interface to avoid circular dependency
 	if tm, ok := tenantManager.(interface {
-		GetGlobalDirectory() string
+		GetGlobalDir() string
 	}); ok {
-		if globalDirectory := tm.GetGlobalDirectory(); globalDirectory != "" {
-			c.GlobalDirectory = globalDirectory
+		if globalDir := tm.GetGlobalDir(); globalDir != "" {
+			c.GlobalDir = globalDir
 		}
 	}
 }
@@ -140,11 +140,11 @@ func (c *Config) Validate() error {
 
 	// Validate global directory if not in-memory
 	if !c.InMemory {
-		absPath, err := filepath.Abs(c.GlobalDirectory)
+		absPath, err := filepath.Abs(c.GlobalDir)
 		if err != nil {
 			return fmt.Errorf("invalid global directory: %w", err)
 		}
-		c.GlobalDirectory = absPath
+		c.GlobalDir = absPath
 	}
 
 	// Validate credentials for authentication
@@ -170,6 +170,6 @@ func contains(slice []string, item string) bool {
 func (c *Config) String() string {
 	return fmt.Sprintf(
 		"Host: %s\nPort: %d\nAuth Mode: %s\nGlobal Dir: %s\nIn Memory: %v\nDashboard: %v\nAuto Create Bucket: %v\nLog Level: %s\nMax Object Size: %d\nMax Buckets: %d",
-		c.Host, c.Port, c.AuthMode, c.GlobalDirectory, c.InMemory, c.EnableDashboard, c.AutoCreateBucket, c.LogLevel, c.MaxObjectSize, c.MaxBuckets,
+		c.Host, c.Port, c.AuthMode, c.GlobalDir, c.InMemory, c.EnableDashboard, c.AutoCreateBucket, c.LogLevel, c.MaxObjectSize, c.MaxBuckets,
 	)
 }

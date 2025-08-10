@@ -109,7 +109,7 @@ func (h *Handler) handleListBuckets(c *gin.Context) {
 
 	if h.tenant != nil {
 		// First, get buckets from the global directory
-		globalDir := h.tenant.GetGlobalDirectory()
+		globalDir := h.tenant.GetGlobalDir()
 		if globalDir != "" {
 			// Read global directory directly to find buckets
 			entries, err := os.ReadDir(globalDir)

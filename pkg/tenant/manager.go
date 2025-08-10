@@ -12,21 +12,21 @@ import (
 type Tenant struct {
 	AccessKeyID     string   `json:"accessKeyId"`
 	SecretAccessKey string   `json:"secretAccessKey"`
-	CustomDirectory string   `json:"customDirectory"`
+	CustomDir       string   `json:"customDir"`
 	Description     string   `json:"description,omitempty"`
 	PublicBuckets   []string `json:"publicBuckets"` // List of public buckets for this tenant
 }
 
 type TenantsConfig struct {
-	GlobalDirectory string   `json:"globalDirectory,omitempty"`
-	Tenants         []Tenant `json:"tenants"`
+	GlobalDir string   `json:"globalDir,omitempty"`
+	Tenants   []Tenant `json:"tenants"`
 }
 
 type Manager struct {
-	configFile      string
-	globalDirectory string
-	tenants         map[string]*Tenant
-	mu              sync.RWMutex
+	configFile string
+	globalDir  string
+	tenants    map[string]*Tenant
+	mu         sync.RWMutex
 }
 
 func NewManager(configFile string) *Manager {
@@ -58,8 +58,8 @@ func (m *Manager) LoadFromFile() error {
 	defer m.mu.Unlock()
 
 	// Store the global directory from tenants.json
-	if config.GlobalDirectory != "" {
-		m.globalDirectory = expandTilde(config.GlobalDirectory)
+	if config.GlobalDir != "" {
+		m.globalDir = expandTilde(config.GlobalDir)
 	}
 
 	m.tenants = make(map[string]*Tenant)
@@ -84,12 +84,12 @@ func (m *Manager) GetDirectory(accessKeyID string) string {
 	defer m.mu.RUnlock()
 
 	// Priority 1: Tenant-specific directory (if specified)
-	if tenant, exists := m.tenants[accessKeyID]; exists && tenant.CustomDirectory != "" {
-		return expandTilde(tenant.CustomDirectory)
+	if tenant, exists := m.tenants[accessKeyID]; exists && tenant.CustomDir != "" {
+		return expandTilde(tenant.CustomDir)
 	}
 
-	// Priority 2: Global directory + accessKeyID (globalDirectory is now required)
-	return filepath.Join(m.globalDirectory, accessKeyID)
+	// Priority 2: Global directory + accessKeyID (globalDir is now required)
+	return filepath.Join(m.globalDir, accessKeyID)
 }
 
 // expandTilde expands the tilde (~) in a path to the user's home directory
@@ -119,16 +119,16 @@ func (m *Manager) GetAllTenants() map[string]string {
 
 	result := make(map[string]string)
 	for accessKey, tenant := range m.tenants {
-		result[accessKey] = tenant.CustomDirectory
+		result[accessKey] = tenant.CustomDir
 	}
 	return result
 }
 
-// GetGlobalDirectory returns the global directory from tenants.json
-func (m *Manager) GetGlobalDirectory() string {
+// GetGlobalDir returns the global directory from tenants.json
+func (m *Manager) GetGlobalDir() string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.globalDirectory
+	return m.globalDir
 }
 
 // IsPublicBucket checks if a bucket is public for any tenant
@@ -186,8 +186,8 @@ func (m *Manager) ListTenants() []*Tenant {
 
 func (m *Manager) saveToFile() error {
 	config := TenantsConfig{
-		GlobalDirectory: m.globalDirectory,
-		Tenants:         make([]Tenant, 0, len(m.tenants)),
+		GlobalDir: m.globalDir,
+		Tenants:   make([]Tenant, 0, len(m.tenants)),
 	}
 
 	for _, tenant := range m.tenants {

@@ -42,8 +42,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 	if host, _ := cmd.Flags().GetString("host"); cmd.Flags().Changed("host") {
 		serveCfg.Host = host
 	}
-	if globalDirectory, _ := cmd.Flags().GetString("global-directory"); cmd.Flags().Changed("global-directory") {
-		serveCfg.GlobalDirectory = globalDirectory
+	if globalDir, _ := cmd.Flags().GetString("global-directory"); cmd.Flags().Changed("global-directory") {
+		serveCfg.GlobalDir = globalDir
 	}
 	if authMode, _ := cmd.Flags().GetString("auth-mode"); cmd.Flags().Changed("auth-mode") {
 		serveCfg.AuthMode = authMode

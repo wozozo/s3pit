@@ -53,7 +53,7 @@ func New(cfg *config.Config) (*Server, error) {
 			log.Printf("Warning: failed to load tenants file: %v", err)
 		} else {
 			// Update config with dataDir from tenants.json if available
-			cfg.UpdateGlobalDirectoryFromTenants(tenantMgr)
+			cfg.UpdateGlobalDirFromTenants(tenantMgr)
 		}
 	}
 
@@ -62,11 +62,11 @@ func New(cfg *config.Config) (*Server, error) {
 
 	// Use tenant-aware storage if tenants are configured
 	if cfg.TenantsFile != "" && tenantMgr != nil {
-		storageBackend = storage.NewTenantAwareStorage(cfg.GlobalDirectory, tenantMgr, cfg.InMemory)
+		storageBackend = storage.NewTenantAwareStorage(cfg.GlobalDir, tenantMgr, cfg.InMemory)
 	} else if cfg.InMemory {
 		storageBackend = storage.NewMemoryStorage()
 	} else {
-		storageBackend, err = storage.NewFileSystemStorage(cfg.GlobalDirectory)
+		storageBackend, err = storage.NewFileSystemStorage(cfg.GlobalDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize storage: %w", err)
 		}
@@ -237,11 +237,11 @@ func (s *Server) getStorageType() string {
 		if s.config.InMemory {
 			return "tenant-aware (in-memory)"
 		}
-		return fmt.Sprintf("tenant-aware filesystem (base: %s)", s.config.GlobalDirectory)
+		return fmt.Sprintf("tenant-aware filesystem (base: %s)", s.config.GlobalDir)
 	}
 
 	if s.config.InMemory {
 		return "in-memory"
 	}
-	return fmt.Sprintf("filesystem (%s)", s.config.GlobalDirectory)
+	return fmt.Sprintf("filesystem (%s)", s.config.GlobalDir)
 }

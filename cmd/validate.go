@@ -72,11 +72,11 @@ func validateTenantsFile(filePath string) error {
 	}
 
 	// Validate global directory (required)
-	if config.GlobalDirectory == "" {
-		return fmt.Errorf("global globalDirectory is required")
+	if config.GlobalDir == "" {
+		return fmt.Errorf("global globalDir is required")
 	}
-	if !isValidDirectoryPath(config.GlobalDirectory) {
-		return fmt.Errorf("global globalDirectory must be an absolute path (starting with /) or home directory path (starting with ~/), got: %s", config.GlobalDirectory)
+	if !isValidDirectoryPath(config.GlobalDir) {
+		return fmt.Errorf("global globalDir must be an absolute path (starting with /) or home directory path (starting with ~/), got: %s", config.GlobalDir)
 	}
 
 	for i, tenant := range config.Tenants {
@@ -94,8 +94,8 @@ func validateTenantsFile(filePath string) error {
 		}
 
 		// Validate custom directory path if provided - must be absolute or start with ~/
-		if tenant.CustomDirectory != "" && !isValidDirectoryPath(tenant.CustomDirectory) {
-			return fmt.Errorf("tenant %d: customDirectory must be an absolute path (starting with /) or home directory path (starting with ~/), got: %s", i, tenant.CustomDirectory)
+		if tenant.CustomDir != "" && !isValidDirectoryPath(tenant.CustomDir) {
+			return fmt.Errorf("tenant %d: customDir must be an absolute path (starting with /) or home directory path (starting with ~/), got: %s", i, tenant.CustomDir)
 		}
 	}
 
