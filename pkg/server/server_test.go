@@ -23,22 +23,19 @@ import (
 	"github.com/wozozo/s3pit/pkg/api"
 	"github.com/wozozo/s3pit/pkg/logger"
 	"github.com/wozozo/s3pit/pkg/tenant"
+	"github.com/wozozo/s3pit/pkg/testutil"
 )
 
 func setupTestServer(t *testing.T) *Server {
-	gin.SetMode(gin.TestMode)
+	// Use testutil for configuration
+	cfg := testutil.NewTestConfig(t, 
+		testutil.WithAuthMode("sigv4"),
+		testutil.WithPort(3333),
+	)
+	cfg.Host = "localhost"
 
 	// Initialize logger with proper settings
 	logger.GetInstance().SetMaxEntries(100)
-
-	cfg := &config.Config{
-		Port:             3333,
-		Host:             "localhost",
-		GlobalDir:        t.TempDir(),
-		InMemory:         true,
-		AutoCreateBucket: true,
-		AuthMode:         "sigv4",
-	}
 
 	server, err := New(cfg)
 	assert.NoError(t, err)

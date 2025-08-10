@@ -10,21 +10,18 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/wozozo/s3pit/internal/config"
 	"github.com/wozozo/s3pit/pkg/auth"
 	"github.com/wozozo/s3pit/pkg/storage"
 	"github.com/wozozo/s3pit/pkg/tenant"
+	"github.com/wozozo/s3pit/pkg/testutil"
 )
 
-func setupTestHandler() (*Handler, *gin.Engine) {
-	gin.SetMode(gin.TestMode)
-
-	cfg := &config.Config{
-		Port:             8080,
-		GlobalDir:        "/tmp/test",
-		AuthMode:         "none",
-		AutoCreateBucket: true,
-	}
+func setupTestHandler(t *testing.T) (*Handler, *gin.Engine) {
+	cfg := testutil.NewTestConfig(t, 
+		testutil.WithPort(8080),
+		testutil.WithAuthMode("none"),
+	)
+	cfg.GlobalDir = "/tmp/test"
 
 	authHandler, _ := auth.NewHandler("none", "", "")
 
@@ -67,7 +64,7 @@ func setupTestHandler() (*Handler, *gin.Engine) {
 }
 
 func TestCreateBucket(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	t.Run("CreateNewBucket", func(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/test-bucket", nil)
@@ -104,7 +101,7 @@ func TestCreateBucket(t *testing.T) {
 }
 
 func TestListBuckets(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	// Create some buckets
 	_, _ = handler.storage.CreateBucket("bucket-1")
@@ -139,7 +136,7 @@ func TestListBuckets(t *testing.T) {
 }
 
 func TestPutGetObject(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	bucket := "test-bucket"
 	key := "test-object.txt"
@@ -198,7 +195,7 @@ func TestPutGetObject(t *testing.T) {
 }
 
 func TestDeleteObject(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	bucket := "test-bucket"
 	key := "delete-me.txt"
@@ -227,7 +224,7 @@ func TestDeleteObject(t *testing.T) {
 }
 
 func TestListObjectsV2(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	bucket := "test-bucket"
 	_, _ = handler.storage.CreateBucket(bucket)
@@ -305,7 +302,7 @@ func TestListObjectsV2(t *testing.T) {
 }
 
 func TestCopyObject(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	srcBucket := "src-bucket"
 	dstBucket := "dst-bucket"
@@ -343,7 +340,7 @@ func TestCopyObject(t *testing.T) {
 }
 
 func TestMultipartUpload(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	bucket := "test-bucket"
 	key := "multipart-object.txt"
@@ -455,7 +452,7 @@ func TestMultipartUpload(t *testing.T) {
 }
 
 func TestErrorResponses(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	t.Run("BucketNotFound", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/nonexistent-bucket", nil)
@@ -509,7 +506,7 @@ func TestErrorResponses(t *testing.T) {
 }
 
 func TestImplicitBucketCreation(t *testing.T) {
-	handler, router := setupTestHandler()
+	handler, router := setupTestHandler(t)
 
 	t.Run("PutObjectCreatesImplicitBucket", func(t *testing.T) {
 		bucket := "implicit-bucket"

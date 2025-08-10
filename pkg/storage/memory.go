@@ -2,8 +2,6 @@ package storage
 
 import (
 	"bytes"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"sort"
@@ -25,18 +23,15 @@ type memoryBucket struct {
 }
 
 type MemoryStorage struct {
-	buckets  map[string]*memoryBucket
-	mu       sync.RWMutex
-	uploads  map[string]*MultipartUpload
-	uploadMu sync.RWMutex
-	parts    map[string]map[int][]byte // uploadId -> partNumber -> data
+	buckets         map[string]*memoryBucket
+	mu              sync.RWMutex
+	multipartMgr    *MultipartManager
 }
 
-func NewMemoryStorage() Storage {
+func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		buckets: make(map[string]*memoryBucket),
-		uploads: make(map[string]*MultipartUpload),
-		parts:   make(map[string]map[int][]byte),
+		buckets:      make(map[string]*memoryBucket),
+		multipartMgr: NewMultipartManager(),
 	}
 }
 
@@ -114,8 +109,7 @@ func (m *MemoryStorage) PutObject(bucket, key string, reader io.Reader, size int
 		return "", err
 	}
 
-	hash := md5.Sum(data)
-	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash[:]))
+	etag := CalculateETag(data)
 
 	b.objects[key] = &memoryObject{
 		data:         data,
@@ -279,8 +273,7 @@ func (m *MemoryStorage) CopyObject(srcBucket, srcKey, dstBucket, dstKey string) 
 	dataCopy := make([]byte, len(srcObj.data))
 	copy(dataCopy, srcObj.data)
 
-	hash := md5.Sum(dataCopy)
-	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash[:]))
+	etag := CalculateETag(dataCopy)
 
 	dstB.objects[dstKey] = &memoryObject{
 		data:         dataCopy,
@@ -301,58 +294,37 @@ func (m *MemoryStorage) InitiateMultipartUpload(bucket, key string) (string, err
 	}
 	m.mu.RUnlock()
 
-	uploadId := fmt.Sprintf("upload-%d-%s", time.Now().UnixNano(), key)
-
-	m.uploadMu.Lock()
-	defer m.uploadMu.Unlock()
-
-	m.uploads[uploadId] = &MultipartUpload{
-		Bucket:    bucket,
-		Key:       key,
-		UploadId:  uploadId,
-		Initiated: time.Now().UTC(),
-		Parts:     make(map[int]PartInfo),
-	}
-	m.parts[uploadId] = make(map[int][]byte)
-
-	return uploadId, nil
+	return m.multipartMgr.InitiateUpload(bucket, key)
 }
 
 // UploadPart uploads a part for a multipart upload
 func (m *MemoryStorage) UploadPart(bucket, key, uploadId string, partNumber int, reader io.Reader, size int64) (string, error) {
-	m.uploadMu.RLock()
-	upload, exists := m.uploads[uploadId]
-	m.uploadMu.RUnlock()
+	m.mu.RLock()
+	if _, exists := m.buckets[bucket]; !exists {
+		m.mu.RUnlock()
+		return "", ErrBucketNotFound
+	}
+	m.mu.RUnlock()
 
+	upload, exists := m.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return "", fmt.Errorf("upload not found: %s", uploadId)
+		return "", fmt.Errorf("upload not found")
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
 		return "", fmt.Errorf("upload mismatch")
 	}
 
-	// Read part data
+	// Read the data from the reader
 	data := make([]byte, size)
-	n, err := io.ReadFull(reader, data)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		return "", err
+	_, err := io.ReadFull(reader, data)
+	if err != nil {
+		return "", fmt.Errorf("failed to read part data: %w", err)
 	}
-	data = data[:n]
 
-	// Calculate ETag
-	hash := md5.Sum(data)
-	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash[:]))
-
-	m.uploadMu.Lock()
-	defer m.uploadMu.Unlock()
-
-	m.parts[uploadId][partNumber] = data
-	upload.Parts[partNumber] = PartInfo{
-		PartNumber:   partNumber,
-		Size:         int64(n),
-		ETag:         etag,
-		LastModified: time.Now().UTC(),
+	etag := CalculateETag(data)
+	if err := m.multipartMgr.StorePart(uploadId, partNumber, data, etag); err != nil {
+		return "", err
 	}
 
 	return etag, nil
@@ -360,109 +332,89 @@ func (m *MemoryStorage) UploadPart(bucket, key, uploadId string, partNumber int,
 
 // CompleteMultipartUpload completes a multipart upload
 func (m *MemoryStorage) CompleteMultipartUpload(bucket, key, uploadId string, parts []CompletedPart) (string, error) {
-	m.uploadMu.Lock()
-	upload, exists := m.uploads[uploadId]
-	if !exists {
-		m.uploadMu.Unlock()
-		return "", fmt.Errorf("upload not found: %s", uploadId)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, exists := m.buckets[bucket]; !exists {
+		return "", ErrBucketNotFound
 	}
 
-	partData := m.parts[uploadId]
-	delete(m.uploads, uploadId)
-	delete(m.parts, uploadId)
-	m.uploadMu.Unlock()
+	upload, exists := m.multipartMgr.GetUpload(uploadId)
+	if !exists {
+		return "", fmt.Errorf("upload not found")
+	}
 
 	if upload.Bucket != bucket || upload.Key != key {
 		return "", fmt.Errorf("upload mismatch")
 	}
 
-	// Ensure all parts are present
-	for _, part := range parts {
-		if _, ok := upload.Parts[part.PartNumber]; !ok {
-			return "", fmt.Errorf("part %d not found", part.PartNumber)
-		}
-	}
-
-	// Sort parts by part number
-	sort.Slice(parts, func(i, j int) bool {
-		return parts[i].PartNumber < parts[j].PartNumber
-	})
-
-	// Concatenate all parts
+	uploadParts, _ := m.multipartMgr.GetParts(uploadId)
+	
+	// Combine all parts
 	var finalData []byte
 	for _, part := range parts {
-		data, ok := partData[part.PartNumber]
-		if !ok {
-			return "", fmt.Errorf("part %d data not found", part.PartNumber)
+		partData, exists := uploadParts[part.PartNumber]
+		if !exists {
+			return "", fmt.Errorf("part %d not found", part.PartNumber)
 		}
-		finalData = append(finalData, data...)
+		finalData = append(finalData, partData...)
 	}
 
 	// Calculate final ETag
-	hash := md5.Sum(finalData)
-	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash[:]))
+	etag := CalculateETag(finalData)
 
-	// Store the final object
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	b, exists := m.buckets[bucket]
-	if !exists {
-		return "", ErrBucketNotFound
-	}
-
-	b.objects[key] = &memoryObject{
+	// Store the combined object
+	m.buckets[bucket].objects[key] = &memoryObject{
 		data:         finalData,
 		contentType:  "application/octet-stream",
 		lastModified: time.Now().UTC(),
 		etag:         etag,
 	}
 
+	// Clean up the multipart upload
+	m.multipartMgr.DeleteUpload(uploadId)
+
 	return etag, nil
 }
 
 // AbortMultipartUpload cancels a multipart upload
 func (m *MemoryStorage) AbortMultipartUpload(bucket, key, uploadId string) error {
-	m.uploadMu.Lock()
-	defer m.uploadMu.Unlock()
+	m.mu.RLock()
+	if _, exists := m.buckets[bucket]; !exists {
+		m.mu.RUnlock()
+		return ErrBucketNotFound
+	}
+	m.mu.RUnlock()
 
-	upload, exists := m.uploads[uploadId]
+	upload, exists := m.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return fmt.Errorf("upload not found: %s", uploadId)
+		return fmt.Errorf("upload not found")
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
 		return fmt.Errorf("upload mismatch")
 	}
 
-	delete(m.uploads, uploadId)
-	delete(m.parts, uploadId)
-
-	return nil
+	return m.multipartMgr.DeleteUpload(uploadId)
 }
 
 // ListParts lists the parts of a multipart upload
 func (m *MemoryStorage) ListParts(bucket, key, uploadId string) ([]PartInfo, error) {
-	m.uploadMu.RLock()
-	defer m.uploadMu.RUnlock()
+	m.mu.RLock()
+	if _, exists := m.buckets[bucket]; !exists {
+		m.mu.RUnlock()
+		return nil, ErrBucketNotFound
+	}
+	m.mu.RUnlock()
 
-	upload, exists := m.uploads[uploadId]
+	upload, exists := m.multipartMgr.GetUpload(uploadId)
 	if !exists {
-		return nil, fmt.Errorf("upload not found: %s", uploadId)
+		return nil, fmt.Errorf("upload not found")
 	}
 
 	if upload.Bucket != bucket || upload.Key != key {
 		return nil, fmt.Errorf("upload mismatch")
 	}
 
-	var parts []PartInfo
-	for _, part := range upload.Parts {
-		parts = append(parts, part)
-	}
-
-	sort.Slice(parts, func(i, j int) bool {
-		return parts[i].PartNumber < parts[j].PartNumber
-	})
-
-	return parts, nil
+	return m.multipartMgr.ListParts(uploadId)
 }

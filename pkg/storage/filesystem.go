@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,15 +13,15 @@ import (
 )
 
 type FileSystemStorage struct {
-	baseDir     string
-	bucketLocks sync.Map // Per-bucket locks for better concurrency
-	uploads     sync.Map // Use sync.Map for better concurrent access
+	baseDir      string
+	bucketLocks  sync.Map // Per-bucket locks for better concurrency
+	multipartMgr *FileSystemMultipartManager
 }
 
-func NewFileSystemStorage(baseDir string) (Storage, error) {
+func NewFileSystemStorage(baseDir string) (*FileSystemStorage, error) {
 	absPath, err := filepath.Abs(baseDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get absolute path: %w", err)
+		return nil, fmt.Errorf("failed to resolve base directory: %w", err)
 	}
 
 	if err := os.MkdirAll(absPath, 0755); err != nil {
@@ -31,7 +29,8 @@ func NewFileSystemStorage(baseDir string) (Storage, error) {
 	}
 
 	return &FileSystemStorage{
-		baseDir: absPath,
+		baseDir:      absPath,
+		multipartMgr: NewFileSystemMultipartManager(absPath),
 	}, nil
 }
 
@@ -39,6 +38,26 @@ func NewFileSystemStorage(baseDir string) (Storage, error) {
 func (fs *FileSystemStorage) getBucketLock(bucket string) *sync.RWMutex {
 	lock, _ := fs.bucketLocks.LoadOrStore(bucket, &sync.RWMutex{})
 	return lock.(*sync.RWMutex)
+}
+
+// saveMetadata saves object metadata to a JSON file
+func (fs *FileSystemStorage) saveMetadata(bucket, key string, metadata *ObjectMetadata) error {
+	objectPath := filepath.Join(fs.baseDir, bucket, key)
+	metaPath := objectPath + ".s3pit_meta.json"
+	
+	meta := map[string]interface{}{
+		"content-type": metadata.ContentType,
+		"etag":         StripETagQuotes(metadata.ETag),
+		"size":         metadata.Size,
+		"modified":     metadata.LastModified,
+	}
+	
+	metaData, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+	
+	return os.WriteFile(metaPath, metaData, 0644)
 }
 
 func (fs *FileSystemStorage) CreateBucket(bucket string) (bool, error) {
@@ -101,11 +120,17 @@ func (fs *FileSystemStorage) PutObject(bucket, key string, reader io.Reader, siz
 		}
 	}()
 
-	hash := md5.New()
-	writer := io.MultiWriter(tempFile, hash)
-
-	written, err := io.Copy(writer, reader)
+	// Read all data to calculate ETag
+	data, err := io.ReadAll(reader)
 	if err != nil {
+		return "", fmt.Errorf("failed to read object data: %w", err)
+	}
+
+	// Calculate ETag using helper
+	etag := CalculateETag(data)
+
+	// Write data to temp file
+	if _, err := tempFile.Write(data); err != nil {
 		return "", fmt.Errorf("failed to write object data: %w", err)
 	}
 
@@ -119,25 +144,23 @@ func (fs *FileSystemStorage) PutObject(bucket, key string, reader io.Reader, siz
 		return "", fmt.Errorf("failed to move object to final location: %w", err)
 	}
 
-	etag := hex.EncodeToString(hash.Sum(nil))
-
 	// Save metadata
 	metaPath := objectPath + ".s3pit_meta.json"
 	meta := map[string]interface{}{
 		"content-type": contentType,
-		"etag":         etag,
-		"size":         written,
+		"etag":         StripETagQuotes(etag),
+		"size":         int64(len(data)),
 		"modified":     time.Now().UTC(),
 	}
 
-	data, err := json.Marshal(meta)
+	metaData, err := json.Marshal(meta)
 	if err != nil {
-		return fmt.Sprintf("\"%s\"", etag), nil
+		return etag, nil
 	}
 
-	_ = os.WriteFile(metaPath, data, 0644)
+	_ = os.WriteFile(metaPath, metaData, 0644)
 
-	return fmt.Sprintf("\"%s\"", etag), nil
+	return etag, nil
 }
 
 func (fs *FileSystemStorage) GetObject(bucket, key string) (io.ReadCloser, *ObjectMetadata, error) {
@@ -468,14 +491,19 @@ func (fs *FileSystemStorage) CopyObject(srcBucket, srcKey, dstBucket, dstKey str
 	}
 	defer dstFile.Close()
 
-	hash := md5.New()
-	writer := io.MultiWriter(dstFile, hash)
-
-	if _, err := io.Copy(writer, srcFile); err != nil {
+	// Read source file data
+	srcData, err := io.ReadAll(srcFile)
+	if err != nil {
 		return "", err
 	}
 
-	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
+	// Write to destination
+	if _, err := dstFile.Write(srcData); err != nil {
+		return "", err
+	}
+
+	// Calculate ETag using helper
+	etag := CalculateETag(srcData)
 
 	// Copy and update metadata
 	srcMetaPath := srcPath + ".s3pit_meta.json"
@@ -484,7 +512,7 @@ func (fs *FileSystemStorage) CopyObject(srcBucket, srcKey, dstBucket, dstKey str
 	if srcMetaData, err := os.ReadFile(srcMetaPath); err == nil {
 		var meta map[string]interface{}
 		if json.Unmarshal(srcMetaData, &meta) == nil {
-			meta["etag"] = strings.Trim(etag, "\"")
+			meta["etag"] = StripETagQuotes(etag)
 			meta["modified"] = time.Now().UTC()
 
 			if data, err := json.Marshal(meta); err == nil {
@@ -507,190 +535,116 @@ func (fs *FileSystemStorage) InitiateMultipartUpload(bucket, key string) (string
 	}
 	lock.RUnlock()
 
-	uploadId := fmt.Sprintf("upload-%d-%s", time.Now().UnixNano(), key)
-
-	upload := &MultipartUpload{
-		Bucket:    bucket,
-		Key:       key,
-		UploadId:  uploadId,
-		Initiated: time.Now().UTC(),
-		Parts:     make(map[int]PartInfo),
-	}
-
-	fs.uploads.Store(uploadId, upload)
-
-	// Create temporary directory for parts
-	tempDir := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId)
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		fs.uploads.Delete(uploadId)
-		return "", fmt.Errorf("failed to create upload directory: %w", err)
-	}
-
-	return uploadId, nil
+	return fs.multipartMgr.InitiateUpload(bucket, key)
 }
 
 // UploadPart uploads a part for a multipart upload
 func (fs *FileSystemStorage) UploadPart(bucket, key, uploadId string, partNumber int, reader io.Reader, size int64) (string, error) {
-	uploadInterface, exists := fs.uploads.Load(uploadId)
+	upload, exists := fs.multipartMgr.GetUpload(uploadId)
 	if !exists {
 		return "", fmt.Errorf("upload not found: %s", uploadId)
 	}
 
-	upload := uploadInterface.(*MultipartUpload)
 	if upload.Bucket != bucket || upload.Key != key {
 		return "", fmt.Errorf("upload mismatch")
 	}
 
-	// Save part to temporary file
-	partPath := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId, fmt.Sprintf("part-%d", partNumber))
-
-	partFile, err := os.Create(partPath)
-	if err != nil {
-		return "", err
-	}
-	defer partFile.Close()
-
-	hash := md5.New()
-	writer := io.MultiWriter(partFile, hash)
-
-	written, err := io.CopyN(writer, reader, size)
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-
-	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
-
-	// Update upload parts
-	upload.Parts[partNumber] = PartInfo{
-		PartNumber:   partNumber,
-		Size:         written,
-		ETag:         etag,
-		LastModified: time.Now().UTC(),
-	}
-
-	return etag, nil
+	return fs.multipartMgr.StorePart(uploadId, partNumber, reader, size)
 }
 
 // CompleteMultipartUpload completes a multipart upload
 func (fs *FileSystemStorage) CompleteMultipartUpload(bucket, key, uploadId string, parts []CompletedPart) (string, error) {
-	uploadInterface, exists := fs.uploads.LoadAndDelete(uploadId)
+	upload, exists := fs.multipartMgr.GetUpload(uploadId)
 	if !exists {
 		return "", fmt.Errorf("upload not found: %s", uploadId)
 	}
 
-	upload := uploadInterface.(*MultipartUpload)
 	if upload.Bucket != bucket || upload.Key != key {
 		return "", fmt.Errorf("upload mismatch")
 	}
 
-	// Ensure all parts are present
-	for _, part := range parts {
-		if _, ok := upload.Parts[part.PartNumber]; !ok {
-			return "", fmt.Errorf("part %d not found", part.PartNumber)
-		}
-	}
-
-	// Sort parts by part number
-	sort.Slice(parts, func(i, j int) bool {
-		return parts[i].PartNumber < parts[j].PartNumber
-	})
-
-	lock := fs.getBucketLock(bucket)
-	lock.Lock()
-	defer lock.Unlock()
-
-	// Create the final object
+	// Combine all parts
 	objectPath := filepath.Join(fs.baseDir, bucket, key)
 	if err := os.MkdirAll(filepath.Dir(objectPath), 0755); err != nil {
 		return "", err
 	}
 
-	finalFile, err := os.Create(objectPath)
+	outFile, err := os.Create(objectPath)
+	if err != nil {
+		return "", err
+	}
+	defer outFile.Close()
+
+	// Copy each part to the final file
+	for _, part := range parts {
+		partPath := fs.multipartMgr.GetPartPath(uploadId, part.PartNumber)
+		partFile, err := os.Open(partPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to open part %d: %w", part.PartNumber, err)
+		}
+
+		if _, err := io.Copy(outFile, partFile); err != nil {
+			partFile.Close()
+			return "", fmt.Errorf("failed to copy part %d: %w", part.PartNumber, err)
+		}
+		partFile.Close()
+	}
+
+	// Calculate final ETag
+	finalFile, err := os.Open(objectPath)
 	if err != nil {
 		return "", err
 	}
 	defer finalFile.Close()
 
-	hash := md5.New()
-	writer := io.MultiWriter(finalFile, hash)
-
-	// Concatenate all parts
-	var totalSize int64
-
-	for _, part := range parts {
-		partPath := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId, fmt.Sprintf("part-%d", part.PartNumber))
-		partFile, err := os.Open(partPath)
-		if err != nil {
-			return "", err
-		}
-
-		written, err := io.Copy(writer, partFile)
-		if err != nil {
-			partFile.Close()
-			return "", err
-		}
-		partFile.Close()
-		totalSize += written
+	data, err := io.ReadAll(finalFile)
+	if err != nil {
+		return "", err
 	}
-
-	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
+	etag := CalculateETag(data)
 
 	// Save metadata
-	meta := map[string]interface{}{
-		"size":         totalSize,
-		"content_type": "application/octet-stream",
-		"etag":         strings.Trim(etag, "\""),
-		"modified":     time.Now().UTC(),
+	metadata := &ObjectMetadata{
+		ContentType:  "application/octet-stream",
+		Size:         int64(len(data)),
+		LastModified: time.Now().UTC(),
+		ETag:         etag,
 	}
 
-	metaPath := objectPath + ".s3pit_meta.json"
-	metaData, _ := json.Marshal(meta)
-	_ = os.WriteFile(metaPath, metaData, 0644)
+	if err := fs.saveMetadata(bucket, key, metadata); err != nil {
+		return "", err
+	}
 
-	// Clean up temporary files
-	tempDir := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId)
-	os.RemoveAll(tempDir)
+	// Clean up the multipart upload
+	fs.multipartMgr.DeleteUpload(uploadId)
 
 	return etag, nil
 }
 
 // AbortMultipartUpload cancels a multipart upload
 func (fs *FileSystemStorage) AbortMultipartUpload(bucket, key, uploadId string) error {
-	uploadInterface, exists := fs.uploads.LoadAndDelete(uploadId)
+	upload, exists := fs.multipartMgr.GetUpload(uploadId)
 	if !exists {
 		return fmt.Errorf("upload not found: %s", uploadId)
 	}
 
-	upload := uploadInterface.(*MultipartUpload)
 	if upload.Bucket != bucket || upload.Key != key {
 		return fmt.Errorf("upload mismatch")
 	}
 
-	// Clean up temporary files
-	tempDir := filepath.Join(fs.baseDir, ".s3pit_uploads", uploadId)
-	return os.RemoveAll(tempDir)
+	return fs.multipartMgr.DeleteUpload(uploadId)
 }
 
 // ListParts lists the parts of a multipart upload
 func (fs *FileSystemStorage) ListParts(bucket, key, uploadId string) ([]PartInfo, error) {
-	uploadInterface, exists := fs.uploads.Load(uploadId)
+	upload, exists := fs.multipartMgr.GetUpload(uploadId)
 	if !exists {
 		return nil, fmt.Errorf("upload not found: %s", uploadId)
 	}
 
-	upload := uploadInterface.(*MultipartUpload)
 	if upload.Bucket != bucket || upload.Key != key {
 		return nil, fmt.Errorf("upload mismatch")
 	}
 
-	var parts []PartInfo
-	for _, part := range upload.Parts {
-		parts = append(parts, part)
-	}
-
-	sort.Slice(parts, func(i, j int) bool {
-		return parts[i].PartNumber < parts[j].PartNumber
-	})
-
-	return parts, nil
+	return fs.multipartMgr.ListParts(uploadId)
 }
