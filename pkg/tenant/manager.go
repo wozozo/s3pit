@@ -141,6 +141,13 @@ func (m *Manager) IsPublicBucket(bucket string) (bool, string) {
 			if publicBucket == bucket || publicBucket == "*" {
 				return true, tenant.AccessKeyID
 			}
+			// Support wildcard patterns like "public-*"
+			if strings.HasSuffix(publicBucket, "*") {
+				prefix := strings.TrimSuffix(publicBucket, "*")
+				if strings.HasPrefix(bucket, prefix) {
+					return true, tenant.AccessKeyID
+				}
+			}
 		}
 	}
 	return false, ""

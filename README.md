@@ -610,6 +610,63 @@ Run with custom tenants file:
 ./s3pit serve --auth-mode sigv4
 ```
 
+## Public Buckets
+
+S3pit supports public bucket access, allowing certain buckets to be accessed without authentication. This is useful for serving static assets, public downloads, or development scenarios where authentication is not needed.
+
+### Configuration
+
+Configure public buckets in your `tenants.json`:
+
+```json
+{
+  "globalDir": "~/s3pit",
+  "tenants": [
+    {
+      "accessKeyId": "app-dev",
+      "secretAccessKey": "app-secret",
+      "customDir": "~/src/app/data",
+      "description": "Application with public assets",
+      "publicBuckets": ["static-assets", "downloads", "public-*"]
+    }
+  ]
+}
+```
+
+### Features
+
+- **Read-Only Access**: Public buckets allow GET/HEAD operations without authentication
+- **Write Protection**: PUT/DELETE/POST operations are blocked even with valid credentials (enforces read-only)
+- **Wildcard Support**: Use patterns like `"public-*"` to match multiple buckets
+- **Access Logging**: Clearly identifies public vs authenticated access in logs
+
+### Usage Examples
+
+```bash
+# Public bucket - no authentication needed for reading
+curl http://localhost:3333/static-assets/logo.png
+
+# Write operations are blocked (returns 403 Forbidden)
+curl -X PUT http://localhost:3333/static-assets/new-file.txt -d "data"
+# Error: Public buckets are read-only
+
+# Private bucket - requires authentication
+curl http://localhost:3333/private-data/file.txt
+# Error: Access Denied
+
+# With authentication - works for private buckets
+export AWS_ACCESS_KEY_ID=app-dev
+export AWS_SECRET_ACCESS_KEY=app-secret
+aws s3 cp s3://private-data/file.txt . --endpoint-url http://localhost:3333
+```
+
+### Security Notes
+
+- Public buckets are strictly read-only to prevent unauthorized modifications
+- Each tenant can define their own public buckets
+- Public access is logged with `Type: public` for audit purposes
+- Presigned URLs still work with public buckets for compatibility
+
 ## API Compatibility Matrix
 
 ### S3 API Operations Support
