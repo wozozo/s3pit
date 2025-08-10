@@ -68,7 +68,12 @@ func LoadFromEnv() *Config {
 }
 
 // UpdateGlobalDirFromTenants updates the GlobalDir from tenant configuration if available
-func (c *Config) UpdateGlobalDirFromTenants(tenantManager interface{}) {
+// skipUpdate should be true if GlobalDir was explicitly set (e.g., via command line)
+func (c *Config) UpdateGlobalDirFromTenants(tenantManager interface{}, skipUpdate bool) {
+	if skipUpdate {
+		return // Don't override explicit setting
+	}
+	
 	// Use reflection-like interface to avoid circular dependency
 	if tm, ok := tenantManager.(interface {
 		GetGlobalDir() string

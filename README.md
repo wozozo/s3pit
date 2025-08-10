@@ -235,7 +235,7 @@ s3pit serve --auth-mode sigv4
 s3pit serve --in-memory
 
 # Custom data directory with logging
-s3pit serve --global-directory /var/s3pit/data --log-level debug
+s3pit serve --global-dir /var/s3pit/data --log-level debug
 ```
 
 ### 2. Configure Your Application
@@ -355,7 +355,7 @@ s3pit serve [options]
 Options:
   --host string               Server host (default "0.0.0.0")
   --port int                  Server port (default 3333)
-  --global-directory string  Override global directory path
+  --global-dir string         Override global directory path
   --auth-mode string          Authentication mode: sigv4 (default "sigv4")
   --tenants-file string       Path to tenants.json for multi-tenancy
   --in-memory                 Use in-memory storage

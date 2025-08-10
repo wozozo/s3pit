@@ -38,7 +38,7 @@ make clean
 make run
 
 # Run with custom options
-./s3pit serve --port 3333 --global-directory ./data
+./s3pit serve --port 3333 --global-dir ./data
 
 ```
 

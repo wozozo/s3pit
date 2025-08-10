@@ -131,6 +131,13 @@ func (m *Manager) GetGlobalDir() string {
 	return m.globalDir
 }
 
+// UpdateGlobalDir updates the global directory for tenant storage
+func (m *Manager) UpdateGlobalDir(globalDir string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.globalDir = globalDir
+}
+
 // IsPublicBucket checks if a bucket is public for any tenant
 func (m *Manager) IsPublicBucket(bucket string) (bool, string) {
 	m.mu.RLock()

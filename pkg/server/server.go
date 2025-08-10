@@ -23,6 +23,10 @@ type Server struct {
 }
 
 func New(cfg *config.Config) (*Server, error) {
+	return NewWithCmdLineOverrides(cfg, make(map[string]bool))
+}
+
+func NewWithCmdLineOverrides(cfg *config.Config, cmdLineOverrides map[string]bool) (*Server, error) {
 	gin.SetMode(gin.ReleaseMode)
 
 	// Initialize logger
@@ -53,7 +57,11 @@ func New(cfg *config.Config) (*Server, error) {
 			log.Printf("Warning: failed to load tenants file: %v", err)
 		} else {
 			// Update config with dataDir from tenants.json if available
-			cfg.UpdateGlobalDirFromTenants(tenantMgr)
+			// Skip update if GlobalDir was explicitly set via command line
+			cfg.UpdateGlobalDirFromTenants(tenantMgr, cmdLineOverrides["global-dir"])
+			
+			// Sync the final GlobalDir to tenantMgr
+			tenantMgr.UpdateGlobalDir(cfg.GlobalDir)
 		}
 	}
 

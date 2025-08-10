@@ -5,11 +5,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +22,7 @@ import (
 	"github.com/wozozo/s3pit/internal/config"
 	"github.com/wozozo/s3pit/pkg/api"
 	"github.com/wozozo/s3pit/pkg/logger"
+	"github.com/wozozo/s3pit/pkg/tenant"
 )
 
 func setupTestServer(t *testing.T) *Server {
@@ -422,4 +426,207 @@ func TestRouterPriorityWithEmptyKey(t *testing.T) {
 				"Expected %s to be handled by %s", tt.path, tt.handler)
 		})
 	}
+}
+
+// TestCommandLineOverrides tests that command line arguments override config file settings
+func TestCommandLineOverrides(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	logger.GetInstance().SetMaxEntries(100)
+
+	// Create temporary directory for test
+	tempDir := t.TempDir()
+	tenantsFile := filepath.Join(tempDir, "tenants.json")
+
+	// Create test tenants.json with globalDir setting
+	tenantsConfig := tenant.TenantsConfig{
+		GlobalDir: tempDir + "/from-tenants-json",
+		Tenants: []tenant.Tenant{
+			{
+				AccessKeyID:     "test-tenant",
+				SecretAccessKey: "test-secret",
+				CustomDir:       "",
+			},
+		},
+	}
+	
+	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
+	assert.NoError(t, err)
+	
+	err = os.WriteFile(tenantsFile, configData, 0644)
+	assert.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		baseConfig  *config.Config
+		overrides   map[string]bool
+		expectedDir string
+		description string
+	}{
+		{
+			name: "No command line override - use tenants.json",
+			baseConfig: &config.Config{
+				Port:        3333,
+				Host:        "localhost",
+				GlobalDir:   tempDir + "/default",
+				TenantsFile: tenantsFile,
+				InMemory:    true,
+				AuthMode:    "sigv4",
+			},
+			overrides:   make(map[string]bool),
+			expectedDir: tempDir + "/from-tenants-json",
+			description: "Should use globalDir from tenants.json when no command line override",
+		},
+		{
+			name: "Command line override - ignore tenants.json",
+			baseConfig: &config.Config{
+				Port:        3333,
+				Host:        "localhost",
+				GlobalDir:   tempDir + "/from-cmdline",
+				TenantsFile: tenantsFile,
+				InMemory:    true,
+				AuthMode:    "sigv4",
+			},
+			overrides: map[string]bool{
+				"global-dir": true,
+			},
+			expectedDir: tempDir + "/from-cmdline",
+			description: "Should use command line globalDir and ignore tenants.json setting",
+		},
+		{
+			name: "Multiple command line overrides",
+			baseConfig: &config.Config{
+				Port:             3334,
+				Host:             "127.0.0.1",
+				GlobalDir:        tempDir + "/from-cmdline-multi",
+				TenantsFile:      tenantsFile,
+				InMemory:         false,
+				AuthMode:         "sigv4",
+				AutoCreateBucket: false,
+			},
+			overrides: map[string]bool{
+				"global-dir":         true,
+				"port":               true,
+				"host":               true,
+				"auto-create-bucket": true,
+			},
+			expectedDir: tempDir + "/from-cmdline-multi",
+			description: "Should respect all command line overrides",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server, err := NewWithCmdLineOverrides(tt.baseConfig, tt.overrides)
+			assert.NoError(t, err)
+			assert.NotNil(t, server)
+
+			// Verify that the global directory is set correctly
+			assert.Equal(t, tt.expectedDir, tt.baseConfig.GlobalDir, tt.description)
+			
+			// For the test with multiple overrides, verify other settings too
+			if tt.name == "Multiple command line overrides" {
+				assert.Equal(t, 3334, tt.baseConfig.Port)
+				assert.Equal(t, "127.0.0.1", tt.baseConfig.Host)
+				assert.Equal(t, false, tt.baseConfig.AutoCreateBucket)
+			}
+		})
+	}
+}
+
+// TestUpdateGlobalDirFromTenants tests the UpdateGlobalDirFromTenants functionality
+func TestUpdateGlobalDirFromTenants(t *testing.T) {
+	tempDir := t.TempDir()
+	tenantsFile := filepath.Join(tempDir, "tenants.json")
+
+	// Create test tenants.json
+	tenantsConfig := tenant.TenantsConfig{
+		GlobalDir: tempDir + "/tenants-global",
+		Tenants: []tenant.Tenant{
+			{
+				AccessKeyID:     "test",
+				SecretAccessKey: "secret",
+			},
+		},
+	}
+	
+	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
+	assert.NoError(t, err)
+	
+	err = os.WriteFile(tenantsFile, configData, 0644)
+	assert.NoError(t, err)
+
+	// Test without command line override
+	cfg := &config.Config{
+		GlobalDir: tempDir + "/original",
+	}
+	
+	tenantMgr := tenant.NewManager(tenantsFile)
+	err = tenantMgr.LoadFromFile()
+	assert.NoError(t, err)
+
+	// Should update when skipUpdate is false
+	cfg.UpdateGlobalDirFromTenants(tenantMgr, false)
+	assert.Equal(t, tempDir+"/tenants-global", cfg.GlobalDir)
+
+	// Should not update when skipUpdate is true
+	cfg.GlobalDir = tempDir + "/cmdline-override"
+	cfg.UpdateGlobalDirFromTenants(tenantMgr, true)
+	assert.Equal(t, tempDir+"/cmdline-override", cfg.GlobalDir)
+}
+
+// TestServerWithTenantManager tests server initialization with tenant manager
+func TestServerWithTenantManager(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	logger.GetInstance().SetMaxEntries(100)
+
+	tempDir := t.TempDir()
+	tenantsFile := filepath.Join(tempDir, "tenants.json")
+
+	// Create test tenants.json
+	tenantsConfig := tenant.TenantsConfig{
+		GlobalDir: tempDir + "/tenant-base",
+		Tenants: []tenant.Tenant{
+			{
+				AccessKeyID:     "tenant1",
+				SecretAccessKey: "secret1",
+				CustomDir:       "",
+			},
+			{
+				AccessKeyID:     "tenant2",
+				SecretAccessKey: "secret2",
+				CustomDir:       tempDir + "/tenant2-custom",
+			},
+		},
+	}
+	
+	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
+	assert.NoError(t, err)
+	
+	err = os.WriteFile(tenantsFile, configData, 0644)
+	assert.NoError(t, err)
+
+	cfg := &config.Config{
+		Port:        3333,
+		Host:        "localhost",
+		GlobalDir:   tempDir + "/default",
+		TenantsFile: tenantsFile,
+		InMemory:    false,
+		AuthMode:    "sigv4",
+	}
+
+	server, err := New(cfg)
+	assert.NoError(t, err)
+	assert.NotNil(t, server)
+	assert.NotNil(t, server.tenantManager)
+
+	// Verify tenant manager has correct tenants
+	tenants := server.tenantManager.ListTenants()
+	assert.Len(t, tenants, 2)
+
+	// Check tenant directories
+	tenant1Dir := server.tenantManager.GetDirectory("tenant1")
+	assert.Equal(t, filepath.Join(tempDir, "tenant-base", "tenant1"), tenant1Dir)
+
+	tenant2Dir := server.tenantManager.GetDirectory("tenant2")
+	assert.Equal(t, tempDir+"/tenant2-custom", tenant2Dir)
 }
