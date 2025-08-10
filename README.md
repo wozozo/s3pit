@@ -725,8 +725,8 @@ const command = new PutObjectCommand({
   Key: "user-upload.jpg"
 });
 
-const presignedUrl = await getSignedUrl(s3Client, command, { 
-  expiresIn: 3600 
+const presignedUrl = await getSignedUrl(s3Client, command, {
+  expiresIn: 3600
 });
 
 // Frontend: Upload using presigned URL
@@ -932,4 +932,4 @@ tail -f ./logs/s3pit_*.log | jq '.'
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details
+MIT License - see [LICENSE](LICENSE.md) file for details
