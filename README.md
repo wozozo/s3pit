@@ -248,8 +248,8 @@ const s3 = new S3Client({
   endpoint: "http://localhost:3333",
   region: "us-east-1",  // Any region works
   credentials: {
-    accessKeyId: "test-key",
-    secretAccessKey: "test-secret"
+    accessKeyId: "local-dev",
+    secretAccessKey: "local-dev-secret"
   },
   forcePathStyle: true  // Required for S3pit
 });
@@ -259,8 +259,8 @@ const s3 = new S3Client({
 #### AWS CLI
 ```bash
 # Configure AWS CLI
-aws configure set aws_access_key_id test-key
-aws configure set aws_secret_access_key test-secret
+aws configure set aws_access_key_id local-dev
+aws configure set aws_secret_access_key local-dev-secret
 aws configure set region us-east-1
 
 # Use with endpoint URL
@@ -303,8 +303,8 @@ const client = new S3Client({
   endpoint: "http://localhost:3333",
   region: "us-east-1",
   credentials: {
-    accessKeyId: "test-key",
-    secretAccessKey: "test-secret"
+    accessKeyId: "local-dev",
+    secretAccessKey: "local-dev-secret"
   },
   forcePathStyle: true
 });
@@ -469,14 +469,31 @@ Default `tenants.json` created at `~/.config/s3pit/tenants.json`:
   "globalDir": "~/s3pit/data",
   "tenants": [
     {
-      "accessKeyId": "test-key",
-      "secretAccessKey": "test-secret",
-      "description": "Default test tenant",
+      "accessKeyId": "local-dev",
+      "secretAccessKey": "local-dev-secret",
+      "description": "Local development with public assets (public-*, static-*, cdn-*)",
+      "publicBuckets": ["public-*", "static-*", "cdn-*"]
+    },
+    {
+      "accessKeyId": "test-app",
+      "secretAccessKey": "test-app-secret",
+      "description": "Test application with specific public buckets",
+      "publicBuckets": ["assets", "downloads"]
+    },
+    {
+      "accessKeyId": "private-app",
+      "secretAccessKey": "private-app-secret",
+      "description": "Private application (all buckets require authentication)",
       "publicBuckets": []
     }
   ]
 }
 ```
+
+**Default Tenants Explained:**
+- **local-dev**: Perfect for frontend development with public asset serving. Buckets matching `public-*`, `static-*`, or `cdn-*` are automatically public (read-only)
+- **test-app**: For testing mixed scenarios with specific public buckets (`assets`, `downloads`)
+- **private-app**: For applications requiring authentication for all operations
 
 **Configuration Properties:**
 - `globalDir` (string, required): Global data directory for all tenants. Must be absolute path (starting with `/`) or home directory path (starting with `~/`)
