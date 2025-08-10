@@ -19,10 +19,8 @@ func TestMultiTenantHandler_ExtractAccessKey(t *testing.T) {
 	})
 
 	handler := &MultiTenantHandler{
-		mode:             ModeSigV4,
-		tenantManager:    tenantManager,
-		defaultAccessKey: "default-key",
-		defaultSecretKey: "default-secret",
+		mode:          ModeSigV4,
+		tenantManager: tenantManager,
 	}
 
 	tests := []struct {
@@ -95,10 +93,8 @@ func TestMultiTenantHandler_AuthenticateSigV4(t *testing.T) {
 	})
 
 	handler := &MultiTenantHandler{
-		mode:             ModeSigV4,
-		tenantManager:    tenantManager,
-		defaultAccessKey: "default",
-		defaultSecretKey: "default-secret",
+		mode:          ModeSigV4,
+		tenantManager: tenantManager,
 	}
 
 	tests := []struct {
@@ -189,10 +185,8 @@ func TestMultiTenantHandler_PresignedURLExpiration(t *testing.T) {
 	})
 
 	handler := &MultiTenantHandler{
-		mode:             ModeSigV4,
-		tenantManager:    tenantManager,
-		defaultAccessKey: "default",
-		defaultSecretKey: "default-secret",
+		mode:          ModeSigV4,
+		tenantManager: tenantManager,
 	}
 
 	tests := []struct {

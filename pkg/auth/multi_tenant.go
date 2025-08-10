@@ -21,13 +21,10 @@ import (
 type MultiTenantHandler struct {
 	mode          AuthMode
 	tenantManager *tenant.Manager
-	// For single-tenant fallback
-	defaultAccessKey string
-	defaultSecretKey string
 }
 
 // NewMultiTenantHandler creates a new multi-tenant authentication handler
-func NewMultiTenantHandler(mode string, tenantManager *tenant.Manager, defaultAccessKey, defaultSecretKey string) (Handler, error) {
+func NewMultiTenantHandler(mode string, tenantManager *tenant.Manager) (Handler, error) {
 	authMode := AuthMode(mode)
 
 	switch authMode {
@@ -38,10 +35,8 @@ func NewMultiTenantHandler(mode string, tenantManager *tenant.Manager, defaultAc
 	}
 
 	return &MultiTenantHandler{
-		mode:             authMode,
-		tenantManager:    tenantManager,
-		defaultAccessKey: defaultAccessKey,
-		defaultSecretKey: defaultSecretKey,
+		mode:          authMode,
+		tenantManager: tenantManager,
 	}, nil
 }
 
@@ -55,9 +50,6 @@ func (h *MultiTenantHandler) Authenticate(r *http.Request) (string, error) {
 	}
 }
 
-func (h *MultiTenantHandler) GetAccessKey() string {
-	return h.defaultAccessKey
-}
 
 func (h *MultiTenantHandler) extractAccessKey(r *http.Request) string {
 	// Try to extract from Authorization header
@@ -104,19 +96,11 @@ func (h *MultiTenantHandler) authenticateSigV4(r *http.Request) (string, error) 
 	if h.tenantManager != nil {
 		if t, exists := h.tenantManager.GetTenant(accessKey); exists {
 			secretKey = t.SecretAccessKey
-		} else if accessKey == h.defaultAccessKey {
-			// Fallback to default credentials
-			secretKey = h.defaultSecretKey
 		} else {
 			return "", fmt.Errorf("access key not found: %s", accessKey)
 		}
 	} else {
-		// No tenant manager, use default credentials
-		if accessKey == h.defaultAccessKey {
-			secretKey = h.defaultSecretKey
-		} else {
-			return "", fmt.Errorf("access key not found: %s", accessKey)
-		}
+		return "", fmt.Errorf("no tenant manager configured")
 	}
 
 	// Check for query string authentication (presigned URL)

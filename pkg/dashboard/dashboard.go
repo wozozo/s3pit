@@ -28,12 +28,10 @@ type Handler struct {
 	storage         storage.Storage
 	tenant          *tenant.Manager
 	authMode        string
-	accessKeyID     string
-	secretAccessKey string
 	region          string
 }
 
-func NewHandler(s storage.Storage, tm *tenant.Manager, authMode, accessKeyID, secretAccessKey, region string) *Handler {
+func NewHandler(s storage.Storage, tm *tenant.Manager, authMode, region string) *Handler {
 	if region == "" {
 		region = "us-east-1"
 	}
@@ -41,8 +39,6 @@ func NewHandler(s storage.Storage, tm *tenant.Manager, authMode, accessKeyID, se
 		storage:         s,
 		tenant:          tm,
 		authMode:        authMode,
-		accessKeyID:     accessKeyID,
-		secretAccessKey: secretAccessKey,
 		region:          region,
 	}
 }
@@ -472,17 +468,13 @@ func (h *Handler) handleGeneratePresignedURL(c *gin.Context) {
 		req.Expires = 3600 // Default 1 hour
 	}
 
-	// Use provided credentials or default ones
-	accessKeyID := h.accessKeyID
-	secretAccessKey := h.secretAccessKey
-	if req.AccessKeyID != "" && req.SecretAccessKey != "" {
-		accessKeyID = req.AccessKeyID
-		secretAccessKey = req.SecretAccessKey
-	}
+	// Use provided credentials from request
+	accessKeyID := req.AccessKeyID
+	secretAccessKey := req.SecretAccessKey
 
 	// Check if we have credentials for SigV4
 	if accessKeyID == "" || secretAccessKey == "" {
-		c.JSON(400, gin.H{"error": "Credentials required for SigV4 presigned URLs"})
+		c.JSON(400, gin.H{"error": "AccessKeyID and SecretAccessKey required for SigV4 presigned URLs"})
 		return
 	}
 
@@ -563,10 +555,7 @@ func (h *Handler) handleGetAuthConfig(c *gin.Context) {
 		"region":   h.region,
 	}
 
-	// Only include access key ID if it exists (not the secret)
-	if h.accessKeyID != "" {
-		config["accessKeyId"] = h.accessKeyID
-	}
+	// No static access key - all authentication is via tenant configuration
 
 	c.JSON(200, config)
 }

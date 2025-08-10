@@ -29,6 +29,10 @@ func init() {
 	serveCmd.Flags().Bool("in-memory", false, "Use in-memory storage instead of filesystem")
 	serveCmd.Flags().Bool("dashboard", true, "Enable web dashboard")
 	serveCmd.Flags().Bool("auto-create-bucket", true, "Automatically create buckets on first upload")
+	serveCmd.Flags().String("log-level", "info", "Log level: debug|info|warn|error")
+	serveCmd.Flags().String("log-dir", "./logs", "Directory for log files")
+	serveCmd.Flags().Bool("no-dashboard", false, "Disable web dashboard")
+	serveCmd.Flags().Int64("max-object-size", 5368709120, "Maximum object size in bytes")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
@@ -60,6 +64,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	if autoCreate, _ := cmd.Flags().GetBool("auto-create-bucket"); cmd.Flags().Changed("auto-create-bucket") {
 		serveCfg.AutoCreateBucket = autoCreate
+	}
+	if logLevel, _ := cmd.Flags().GetString("log-level"); cmd.Flags().Changed("log-level") {
+		serveCfg.LogLevel = logLevel
+	}
+	if logDir, _ := cmd.Flags().GetString("log-dir"); cmd.Flags().Changed("log-dir") {
+		serveCfg.LogDir = logDir
+	}
+	if noDashboard, _ := cmd.Flags().GetBool("no-dashboard"); cmd.Flags().Changed("no-dashboard") {
+		serveCfg.EnableDashboard = !noDashboard
+	}
+	if maxObjectSize, _ := cmd.Flags().GetInt64("max-object-size"); cmd.Flags().Changed("max-object-size") {
+		serveCfg.MaxObjectSize = maxObjectSize
 	}
 
 	// Initialize config directory and default tenants.json if needed

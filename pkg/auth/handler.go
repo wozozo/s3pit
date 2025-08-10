@@ -17,7 +17,6 @@ import (
 
 type Handler interface {
 	Authenticate(r *http.Request) (string, error)
-	GetAccessKey() string
 }
 
 type AuthMode string
@@ -60,9 +59,6 @@ func (h *handler) Authenticate(r *http.Request) (string, error) {
 	}
 }
 
-func (h *handler) GetAccessKey() string {
-	return h.accessKeyID
-}
 
 func (h *handler) authenticateSigV4(r *http.Request) (string, error) {
 	// Store current request for use in helper methods

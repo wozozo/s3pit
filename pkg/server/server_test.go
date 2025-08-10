@@ -34,8 +34,6 @@ func setupTestServer(t *testing.T) *Server {
 		InMemory:         true,
 		AutoCreateBucket: true,
 		AuthMode:         "sigv4",
-		AccessKeyID:      "test",
-		SecretAccessKey:  "test",
 	}
 
 	server, err := New(cfg)
@@ -55,9 +53,6 @@ func (h *testAuthHandler) Authenticate(r *http.Request) (string, error) {
 	return "test", nil
 }
 
-func (h *testAuthHandler) GetAccessKey() string {
-	return "test"
-}
 
 // signRequest adds AWS Signature V4 authentication to a request
 func signRequest(req *http.Request, accessKey, secretKey string) {

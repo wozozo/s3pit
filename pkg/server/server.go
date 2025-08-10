@@ -73,7 +73,7 @@ func New(cfg *config.Config) (*Server, error) {
 	}
 
 	// Use MultiTenantHandler for authentication
-	authHandler, err := auth.NewMultiTenantHandler(cfg.AuthMode, tenantMgr, cfg.AccessKeyID, cfg.SecretAccessKey)
+	authHandler, err := auth.NewMultiTenantHandler(cfg.AuthMode, tenantMgr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize auth handler: %w", err)
 	}
@@ -196,8 +196,6 @@ func (s *Server) setupDashboard() {
 		s.storage,
 		s.tenantManager,
 		s.config.AuthMode,
-		s.config.AccessKeyID,
-		s.config.SecretAccessKey,
 		region,
 	)
 	dashboardHandler.RegisterRoutes(s.router)

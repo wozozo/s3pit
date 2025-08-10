@@ -356,17 +356,15 @@ Options:
   --host string               Server host (default "0.0.0.0")
   --port int                  Server port (default 3333)
   --global-directory string  Override global directory path
-  --auth-mode string          Authentication mode: sigv4
+  --auth-mode string          Authentication mode: sigv4 (default "sigv4")
+  --tenants-file string       Path to tenants.json for multi-tenancy
   --in-memory                 Use in-memory storage
+  --dashboard                 Enable web dashboard (default true)
   --auto-create-bucket        Auto-create buckets on upload (default true)
-  --access-key-id string      Access key for static auth (default "s3pitadmin")
-  --secret-access-key string  Secret key for static auth (default "s3pitadmin")
   --log-level string          Log level: debug|info|warn|error (default "info")
   --log-dir string            Directory for log files (default "./logs")
   --no-dashboard              Disable web dashboard
-  --tenants-file string       Path to tenants.json for multi-tenancy
   --max-object-size int       Maximum object size in bytes (default 5368709120)
-  --max-buckets int           Maximum number of buckets (default 100)
 ```
 
 ### Environment Variables
@@ -377,12 +375,10 @@ All command-line options can be configured via environment variables with the `S
 |---------------------|------|---------|-------------|
 | `S3PIT_HOST` | string | "0.0.0.0" | Server bind address. Use "127.0.0.1" for localhost only |
 | `S3PIT_PORT` | int | 3333 | Server port. Common alternatives: 9001, 8080 |
-| `S3PIT_DATA_DIR` | string | "./data" | Directory for storing buckets and objects |
+| `S3PIT_GLOBAL_DIRECTORY` | string | "~/s3pit" | Global directory for storing buckets and objects |
 | `S3PIT_AUTH_MODE` | string | | Authentication mode:<br>• `sigv4`: Full AWS Signature V4 validation |
 | `S3PIT_IN_MEMORY` | bool | false | Store all data in memory (lost on restart) |
 | `S3PIT_AUTO_CREATE_BUCKET` | bool | true | Auto-create buckets on first upload |
-| `S3PIT_ACCESS_KEY_ID` | string | "s3pitadmin" | Access key for authentication |
-| `S3PIT_SECRET_ACCESS_KEY` | string | "s3pitadmin" | Secret key for authentication |
 | `S3PIT_LOG_LEVEL` | string | "info" | Minimum log level: debug, info, warn, error |
 | `S3PIT_LOG_DIR` | string | "./logs" | Directory for log files |
 | `S3PIT_ENABLE_FILE_LOG` | bool | true | Write logs to files |
@@ -390,7 +386,6 @@ All command-line options can be configured via environment variables with the `S
 | `S3PIT_LOG_ROTATION_SIZE` | int | 104857600 | Log rotation size in bytes (default 100MB) |
 | `S3PIT_MAX_LOG_ENTRIES` | int | 10000 | Max in-memory log entries for dashboard |
 | `S3PIT_MAX_OBJECT_SIZE` | int | 5368709120 | Max object size in bytes (default 5GB) |
-| `S3PIT_MAX_BUCKETS` | int | 100 | Maximum number of buckets allowed |
 | `S3PIT_ENABLE_DASHBOARD` | bool | true | Enable web dashboard at /dashboard |
 | `S3PIT_TENANTS_FILE` | string | "~/.config/s3pit/tenants.json" | Path to tenants.json for multi-tenancy (auto-created) |
 
@@ -406,10 +401,8 @@ s3pit serve
 
 #### Production Setup
 ```bash
-# Secure setup with custom credentials and persistent storage
-export S3PIT_ACCESS_KEY_ID=myaccesskey
-export S3PIT_SECRET_ACCESS_KEY=mysecretkey
-export S3PIT_DATA_DIR=/var/lib/s3pit/data
+# Secure setup with persistent storage
+export S3PIT_GLOBAL_DIRECTORY=/var/lib/s3pit/data
 export S3PIT_LOG_LEVEL=info
 s3pit serve
 ```

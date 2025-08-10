@@ -17,8 +17,6 @@ type Config struct {
 	InMemory         bool
 	EnableDashboard  bool
 	AutoCreateBucket bool
-	AccessKeyID      string
-	SecretAccessKey  string
 	Region           string
 	LogLevel         string
 	LogDir           string
@@ -27,7 +25,6 @@ type Config struct {
 	LogRotationSize  int64
 	MaxLogEntries    int
 	MaxObjectSize    int64
-	MaxBuckets       int
 }
 
 // expandTilde expands the tilde (~) in a path to the user's home directory
@@ -57,8 +54,6 @@ func LoadFromEnv() *Config {
 		InMemory:         getEnvAsBoolOrDefault("S3PIT_IN_MEMORY", false),
 		EnableDashboard:  getEnvAsBoolOrDefault("S3PIT_ENABLE_DASHBOARD", true),
 		AutoCreateBucket: getEnvAsBoolOrDefault("S3PIT_AUTO_CREATE_BUCKET", true),
-		AccessKeyID:      getEnvOrDefault("S3PIT_ACCESS_KEY_ID", "s3pitadmin"),
-		SecretAccessKey:  getEnvOrDefault("S3PIT_SECRET_ACCESS_KEY", "s3pitadmin"),
 		Region:           getEnvOrDefault("S3PIT_REGION", "us-east-1"),
 		LogLevel:         getEnvOrDefault("S3PIT_LOG_LEVEL", "info"),
 		LogDir:           getEnvOrDefault("S3PIT_LOG_DIR", "./logs"),
@@ -67,7 +62,6 @@ func LoadFromEnv() *Config {
 		LogRotationSize:  getEnvAsInt64OrDefault("S3PIT_LOG_ROTATION_SIZE", 100*1024*1024), // 100MB default
 		MaxLogEntries:    getEnvAsIntOrDefault("S3PIT_MAX_LOG_ENTRIES", 10000),
 		MaxObjectSize:    getEnvAsInt64OrDefault("S3PIT_MAX_OBJECT_SIZE", 5*1024*1024*1024), // 5GB default
-		MaxBuckets:       getEnvAsIntOrDefault("S3PIT_MAX_BUCKETS", 100),
 	}
 
 	return cfg
@@ -147,12 +141,7 @@ func (c *Config) Validate() error {
 		c.GlobalDir = absPath
 	}
 
-	// Validate credentials for authentication
-	if c.AuthMode == "sigv4" {
-		if c.AccessKeyID == "" || c.SecretAccessKey == "" {
-			return fmt.Errorf("access key and secret key are required for auth mode: %s", c.AuthMode)
-		}
-	}
+	// Note: Credentials are validated from tenants.json file, not from static config
 
 	return nil
 }
@@ -169,7 +158,7 @@ func contains(slice []string, item string) bool {
 // String returns a string representation of the configuration
 func (c *Config) String() string {
 	return fmt.Sprintf(
-		"Host: %s\nPort: %d\nAuth Mode: %s\nGlobal Dir: %s\nIn Memory: %v\nDashboard: %v\nAuto Create Bucket: %v\nLog Level: %s\nMax Object Size: %d\nMax Buckets: %d",
-		c.Host, c.Port, c.AuthMode, c.GlobalDir, c.InMemory, c.EnableDashboard, c.AutoCreateBucket, c.LogLevel, c.MaxObjectSize, c.MaxBuckets,
+		"Host: %s\nPort: %d\nAuth Mode: %s\nGlobal Dir: %s\nIn Memory: %v\nDashboard: %v\nAuto Create Bucket: %v\nLog Level: %s\nMax Object Size: %d",
+		c.Host, c.Port, c.AuthMode, c.GlobalDir, c.InMemory, c.EnableDashboard, c.AutoCreateBucket, c.LogLevel, c.MaxObjectSize,
 	)
 }

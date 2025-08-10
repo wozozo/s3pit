@@ -77,10 +77,6 @@ func (h *testAuthHandlerForPublicBuckets) Authenticate(r *http.Request) (string,
 	return "", fmt.Errorf("invalid authorization")
 }
 
-func (h *testAuthHandlerForPublicBuckets) GetAccessKey() string {
-	// This is used for dashboard/UI purposes, not needed for tests
-	return ""
-}
 
 func setupTestServerWithPublicBuckets(t *testing.T) (*Server, string, func()) {
 	// Create temporary directory for test
