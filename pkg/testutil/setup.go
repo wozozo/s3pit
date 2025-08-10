@@ -8,6 +8,11 @@ import (
 	"github.com/wozozo/s3pit/pkg/storage"
 )
 
+// InitTestMode sets Gin to test mode
+func InitTestMode() {
+	gin.SetMode(gin.TestMode)
+}
+
 // ConfigOption allows customizing test configurations
 type ConfigOption func(*config.Config)
 

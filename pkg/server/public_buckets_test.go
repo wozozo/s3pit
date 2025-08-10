@@ -20,6 +20,7 @@ import (
 	"github.com/wozozo/s3pit/internal/config"
 	"github.com/wozozo/s3pit/pkg/storage"
 	"github.com/wozozo/s3pit/pkg/tenant"
+	"github.com/wozozo/s3pit/pkg/testutil"
 )
 
 // testAuthHandlerForPublicBuckets implements Handler interface for testing with tenant support
@@ -79,6 +80,8 @@ func (h *testAuthHandlerForPublicBuckets) Authenticate(r *http.Request) (string,
 
 
 func setupTestServerWithPublicBuckets(t *testing.T) (*Server, string, func()) {
+	// Initialize test mode
+	testutil.InitTestMode()
 	// Create temporary directory for test
 	tmpDir, err := os.MkdirTemp("", "s3pit-public-test")
 	require.NoError(t, err)
@@ -194,8 +197,6 @@ func TestPublicBucketReadAccess(t *testing.T) {
 	server, _, cleanup := setupTestServerWithPublicBuckets(t)
 	defer cleanup()
 
-	gin.SetMode(gin.TestMode)
-
 	t.Run("GET request to public bucket without auth succeeds", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/public-bucket/test.txt", nil)
 		w := httptest.NewRecorder()
@@ -229,8 +230,6 @@ func TestPublicBucketReadAccess(t *testing.T) {
 func TestPublicBucketWriteRestriction(t *testing.T) {
 	server, _, cleanup := setupTestServerWithPublicBuckets(t)
 	defer cleanup()
-
-	gin.SetMode(gin.TestMode)
 
 	t.Run("PUT request to public bucket without auth is denied", func(t *testing.T) {
 		body := bytes.NewBufferString("new content")
@@ -291,8 +290,6 @@ func TestNonPublicBucketAccess(t *testing.T) {
 	server, _, cleanup := setupTestServerWithPublicBuckets(t)
 	defer cleanup()
 
-	gin.SetMode(gin.TestMode)
-
 	t.Run("GET request to non-public bucket without auth is denied", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/private-bucket/secret.txt", nil)
 		w := httptest.NewRecorder()
@@ -345,8 +342,6 @@ func TestNonPublicBucketAccess(t *testing.T) {
 func TestPresignedURLAccess(t *testing.T) {
 	server, _, cleanup := setupTestServerWithPublicBuckets(t)
 	defer cleanup()
-
-	gin.SetMode(gin.TestMode)
 
 	t.Run("Presigned URL for private bucket works", func(t *testing.T) {
 		// Generate presigned URL parameters
@@ -426,8 +421,6 @@ func TestPresignedURLAccess(t *testing.T) {
 func TestAccessLogging(t *testing.T) {
 	server, _, cleanup := setupTestServerWithPublicBuckets(t)
 	defer cleanup()
-
-	gin.SetMode(gin.TestMode)
 
 	t.Run("Public access is logged correctly", func(t *testing.T) {
 		// Capture log output using a custom writer
@@ -510,8 +503,6 @@ func TestAccessLogging(t *testing.T) {
 func TestWildcardPublicBuckets(t *testing.T) {
 	server, _, cleanup := setupTestServerWithPublicBuckets(t)
 	defer cleanup()
-
-	gin.SetMode(gin.TestMode)
 
 	// Test that wildcard "public-*" matches "public-data"
 	t.Run("Wildcard pattern matches bucket prefix", func(t *testing.T) {
