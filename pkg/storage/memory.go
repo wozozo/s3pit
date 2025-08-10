@@ -373,7 +373,7 @@ func (m *MemoryStorage) CompleteMultipartUpload(bucket, key, uploadId string, pa
 	}
 
 	// Clean up the multipart upload
-	m.multipartMgr.DeleteUpload(uploadId)
+	_ = m.multipartMgr.DeleteUpload(uploadId)
 
 	return etag, nil
 }

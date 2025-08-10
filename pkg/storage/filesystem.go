@@ -618,7 +618,7 @@ func (fs *FileSystemStorage) CompleteMultipartUpload(bucket, key, uploadId strin
 	}
 
 	// Clean up the multipart upload
-	fs.multipartMgr.DeleteUpload(uploadId)
+	_ = fs.multipartMgr.DeleteUpload(uploadId)
 
 	return etag, nil
 }
