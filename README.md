@@ -41,26 +41,26 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
 **Option A: Repository-Local Storage** (each project's data in its own repo)
 ```json
 {
-  "dataDir": "~/s3data",
+  "globalDirectory": "~/s3data",
   "tenants": [
     {
       "accessKeyId": "ecommerce-dev",
       "secretAccessKey": "ecommerce-secret",
-      "directory": "~/src/github.com/yourname/ecommerce-app/data",
+      "customDirectory": "~/src/github.com/yourname/ecommerce-app/data",
       "description": "E-commerce app development",
       "publicBuckets": ["product-images"]
     },
     {
       "accessKeyId": "blog-dev",
       "secretAccessKey": "blog-secret", 
-      "directory": "~/src/github.com/yourname/blog-platform/data",
+      "customDirectory": "~/src/github.com/yourname/blog-platform/data",
       "description": "Blog platform development",
       "publicBuckets": ["public-assets"]
     },
     {
       "accessKeyId": "images-dev",
       "secretAccessKey": "images-secret",
-      "directory": "~/src/github.com/yourname/image-processor/data", 
+      "customDirectory": "~/src/github.com/yourname/image-processor/data", 
       "description": "Image processor development",
       "publicBuckets": []
     }
@@ -71,7 +71,7 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
 **Option B: Centralized Storage** (all projects under one directory)
 ```json
 {
-  "dataDir": "~/s3data",
+  "globalDirectory": "~/s3data",
   "tenants": [
     {
       "accessKeyId": "ecommerce-dev",
@@ -92,7 +92,7 @@ Create `~/.config/s3pit/tenants.json` (auto-created on first run, or customize i
 }
 ```
 
-> **💡 Auto-Organization**: When `directory` is omitted, S3pit automatically organizes projects under the global `dataDir`:
+> **💡 Auto-Organization**: When `customDirectory` is omitted, S3pit automatically organizes projects under the global `globalDirectory`:
 > - `ecommerce-dev` → `~/s3data/ecommerce-dev/`
 > - `blog-dev` → `~/s3data/blog-dev/`  
 > - `images-dev` → `~/s3data/images-dev/`
@@ -114,7 +114,7 @@ s3pit serve  # Runs on localhost:3333, serves all tenants
 
 ### Step 3: Develop Multiple Projects Simultaneously
 
-**Option A: Repository-Local Storage** (when using specific `directory` settings)
+**Option A: Repository-Local Storage** (when using specific `customDirectory` settings)
 ```bash
 # Project 1: E-commerce app
 cd ~/src/github.com/yourname/ecommerce-app
@@ -133,7 +133,7 @@ ls ~/src/github.com/yourname/ecommerce-app/data/     # E-commerce buckets
 ls ~/src/github.com/yourname/blog-platform/data/    # Blog buckets  
 ```
 
-**Option B: Centralized Storage** (when using global `dataDir`)
+**Option B: Centralized Storage** (when using global `globalDirectory`)
 ```bash
 # Project 1: E-commerce app
 export AWS_ACCESS_KEY_ID=ecommerce-dev
@@ -466,7 +466,7 @@ On first run, S3pit automatically:
 Default `tenants.json` created at `~/.config/s3pit/tenants.json`:
 ```json
 {
-  "dataDir": "~/s3pit/data",
+  "globalDirectory": "~/s3pit/data",
   "tenants": [
     {
       "accessKeyId": "test-key",
@@ -479,10 +479,10 @@ Default `tenants.json` created at `~/.config/s3pit/tenants.json`:
 ```
 
 **Configuration Properties:**
-- `dataDir` (string, required): Global data directory for all tenants. Must be absolute path (starting with `/`) or home directory path (starting with `~/`)
+- `globalDirectory` (string, required): Global data directory for all tenants. Must be absolute path (starting with `/`) or home directory path (starting with `~/`)
 - `accessKeyId` (string, required): Access key identifier for authentication
 - `secretAccessKey` (string, required): Secret access key for authentication  
-- `directory` (string, optional): Tenant-specific storage directory path. If omitted, uses `{dataDir}/{accessKeyId}/`. Must be absolute path (starting with `/`) or home directory path (starting with `~/`)
+- `customDirectory` (string, optional): Tenant-specific storage directory path. If omitted, uses `{globalDirectory}/{accessKeyId}/`. Must be absolute path (starting with `/`) or home directory path (starting with `~/`)
 - `description` (string, optional): Human-readable description of the tenant
 - `publicBuckets` (array, optional): List of bucket names that allow public access without authentication
 
@@ -494,19 +494,19 @@ S3pit's unique selling point is **flexible directory mapping** that reduces cogn
 
 ```json
 {
-  "dataDir": "~/s3data",
+  "globalDirectory": "~/s3data",
   "tenants": [
     {
       "accessKeyId": "app1-dev",
       "secretAccessKey": "app1-secret",
-      "directory": "~/src/github.com/example-user/app1/data",
+      "customDirectory": "~/src/github.com/example-user/app1/data",
       "description": "App1 development storage",
       "publicBuckets": []
     },
     {
       "accessKeyId": "app2-dev", 
       "secretAccessKey": "app2-secret",
-      "directory": "~/src/github.com/example-user/app2/data",
+      "customDirectory": "~/src/github.com/example-user/app2/data",
       "description": "App2 development storage",
       "publicBuckets": ["public-assets"]
     }
@@ -559,19 +559,19 @@ ls app2/data/  # Shows buckets and objects for app2
 
 ```json
 {
-  "dataDir": "/var/lib/s3pit/data",
+  "globalDirectory": "/var/lib/s3pit/data",
   "tenants": [
     {
       "accessKeyId": "development",
       "secretAccessKey": "dev-secret-key",
-      "directory": "/var/lib/s3pit/dev",
+      "customDirectory": "/var/lib/s3pit/dev",
       "description": "Development environment",
       "publicBuckets": ["test-uploads", "temp-files"]
     },
     {
       "accessKeyId": "production",
       "secretAccessKey": "prod-secret-key",
-      "description": "Production environment - uses global dataDir",
+      "description": "Production environment - uses global globalDirectory",
       "publicBuckets": []
     }
   ]
@@ -582,17 +582,17 @@ ls app2/data/  # Shows buckets and objects for app2
 
 S3pit uses a simple priority system to determine where to store data:
 
-1. **Tenant-specific `directory`** (if specified): `{tenant.directory}/{bucket}/{object}`
-2. **Global `dataDir` + accessKeyId**: `{dataDir}/{accessKeyId}/{bucket}/{object}`
+1. **Tenant-specific `customDirectory`** (if specified): `{tenant.customDirectory}/{bucket}/{object}`
+2. **Global `globalDirectory` + accessKeyId**: `{globalDirectory}/{accessKeyId}/{bucket}/{object}`
 
 **Examples:**
 ```bash
 # Configuration:
 {
-  "dataDir": "~/s3data",
+  "globalDirectory": "~/s3data",
   "tenants": [
-    {"accessKeyId": "project-a", ...},                    # Uses global dataDir
-    {"accessKeyId": "project-b", "directory": "~/myapp/data", ...}  # Uses specific directory
+    {"accessKeyId": "project-a", ...},                    # Uses global globalDirectory
+    {"accessKeyId": "project-b", "customDirectory": "~/myapp/data", ...}  # Uses specific directory
   ]
 }
 
