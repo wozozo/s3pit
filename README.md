@@ -779,17 +779,15 @@ AWS_ACCESS_KEY_ID=customer1 AWS_SECRET_ACCESS_KEY=customer1secret \
   aws s3 ls --endpoint-url http://localhost:3333
 ```
 
-## Performance Optimizations
+## Performance Features
 
-S3pit includes built-in performance optimizations that make it fast and efficient for development use:
+S3pit is designed for efficient local development and testing:
 
-### Built-in Optimizations
+### Built-in Features
 The filesystem storage backend includes:
-- **Buffered I/O**: Automatically uses buffering for large file operations (>1MB)
-- **Metadata Caching**: In-memory cache for frequently accessed object metadata
 - **Per-Bucket Locking**: Reduces lock contention with bucket-level locks instead of global locks
-- **Memory Pooling**: Reuses buffers to reduce memory allocations
-- **Streaming Optimization**: Efficient streaming for large files with 64KB buffer sizes
+- **Atomic File Operations**: Uses temporary files and atomic renames for data consistency
+- **Streaming I/O**: Direct file streaming for efficient memory usage
 
 ### Performance Tuning
 ```bash
@@ -799,12 +797,6 @@ export S3PIT_IN_MEMORY=true  # Keep all data in memory
 # For large file workloads
 export S3PIT_MAX_OBJECT_SIZE=10737418240  # 10GB
 ```
-
-### Performance Characteristics
-- **GetObject**: 2x faster for small files, 18% faster for large files
-- **GetObjectMetadata**: 8x faster with warm cache
-- **Concurrent Access**: 88% better throughput than naive implementation
-- **Memory Usage**: 80% fewer allocations for metadata operations
 
 ## Debug Mode
 
