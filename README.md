@@ -656,20 +656,6 @@ Run with custom tenants file:
 | | GetObjectLockConfiguration | ❌ Not Implemented | |
 | | PutObjectLockConfiguration | ❌ Not Implemented | |
 
-### SDK Compatibility
-
-| SDK | Version Tested | Status | Notes |
-|-----|----------------|--------|-------|
-| AWS CLI | 2.x | ✅ Full | All basic operations work |
-| AWS SDK JavaScript v3 | 3.x | ✅ Full | Node.js and browser |
-| AWS SDK JavaScript v2 | 2.x | ✅ Full | Legacy support |
-| AWS SDK Python (boto3) | 1.26+ | ✅ Full | |
-| AWS SDK Go | v1, v2 | ✅ Full | |
-| AWS SDK Java | 2.x | ✅ Full | |
-| AWS SDK .NET | 3.x | ✅ Full | |
-| MinIO Client | Latest | ✅ Full | |
-| Rclone | 1.6+ | ✅ Full | |
-| Cyberduck | 7.x | ⚠️ Partial | Basic operations only |
 
 
 ## Common Use Cases
@@ -753,64 +739,7 @@ export S3PIT_MAX_OBJECT_SIZE=10737418240  # 10GB
 - **Concurrent Access**: 88% better throughput than naive implementation
 - **Memory Usage**: 80% fewer allocations for metadata operations
 
-## Troubleshooting
-
-### Common Issues and Solutions
-
-#### 1. Port Already in Use
-
-**Error:** `bind: address already in use`
-
-**Solutions:**
-```bash
-# Use a different port
-s3pit serve --port 9001
-
-# Or find and kill process using port 3333
-lsof -i :3333  # macOS/Linux
-kill -9 $(lsof -t -i:3333)
-```
-
-#### 2. Authentication Failures
-
-**Error:** `The request signature we calculated does not match`
-
-**Solutions:**
-```bash
-# Use default credentials
-export AWS_ACCESS_KEY_ID=test-key
-export AWS_SECRET_ACCESS_KEY=test-secret
-```
-
-#### 3. Connection Refused
-
-**Error:** `Could not connect to the endpoint URL`
-
-**Solutions:**
-```bash
-# Check if S3pit is running and use correct URL
-ps aux | grep s3pit
-aws s3 ls --endpoint-url http://localhost:3333  # Not https
-```
-
-#### 4. Bucket Not Found
-
-**Error:** `NoSuchBucket: The specified bucket does not exist`
-
-**Solutions:**
-```bash
-# Enable auto-create (default) or create explicitly
-s3pit serve --auto-create-bucket
-aws s3 mb s3://my-bucket --endpoint-url http://localhost:3333
-```
-
-#### 5. CORS Issues in Browser
-
-**Error:** `Access to XMLHttpRequest blocked by CORS policy`
-
-**Solution:** S3pit returns default wildcard CORS. For custom CORS, use `PutBucketCorsCommand` with your S3 client.
-
-### Debug Mode
+## Debug Mode
 
 Enable debug logging for detailed troubleshooting:
 
@@ -825,13 +754,6 @@ s3pit serve --log-level debug
 # Check logs
 tail -f ./logs/s3pit_*.log | jq '.'
 ```
-
-### Getting Help
-
-1. **Check the dashboard**: http://localhost:3333/dashboard provides real-time logs and status
-2. **GitHub Issues**: https://github.com/wozozo/s3pit/issues
-3. **Enable debug logging**: `--log-level debug` for detailed information
-4. **Check CLAUDE.md**: Project-specific documentation and notes
 
 ## Development
 
