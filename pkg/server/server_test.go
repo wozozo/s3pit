@@ -28,7 +28,7 @@ import (
 
 func setupTestServer(t *testing.T) *Server {
 	// Use testutil for configuration
-	cfg := testutil.NewTestConfig(t, 
+	cfg := testutil.NewTestConfig(t,
 		testutil.WithAuthMode("sigv4"),
 		testutil.WithPort(3333),
 	)
@@ -53,7 +53,6 @@ type testAuthHandler struct{}
 func (h *testAuthHandler) Authenticate(r *http.Request) (string, error) {
 	return "test", nil
 }
-
 
 // signRequest adds AWS Signature V4 authentication to a request
 func signRequest(req *http.Request, accessKey, secretKey string) {
@@ -445,10 +444,10 @@ func TestCommandLineOverrides(t *testing.T) {
 			},
 		},
 	}
-	
+
 	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
 	assert.NoError(t, err)
-	
+
 	err = os.WriteFile(tenantsFile, configData, 0644)
 	assert.NoError(t, err)
 
@@ -519,7 +518,7 @@ func TestCommandLineOverrides(t *testing.T) {
 
 			// Verify that the global directory is set correctly
 			assert.Equal(t, tt.expectedDir, tt.baseConfig.GlobalDir, tt.description)
-			
+
 			// For the test with multiple overrides, verify other settings too
 			if tt.name == "Multiple command line overrides" {
 				assert.Equal(t, 3334, tt.baseConfig.Port)
@@ -545,10 +544,10 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 			},
 		},
 	}
-	
+
 	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
 	assert.NoError(t, err)
-	
+
 	err = os.WriteFile(tenantsFile, configData, 0644)
 	assert.NoError(t, err)
 
@@ -556,7 +555,7 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 	cfg := &config.Config{
 		GlobalDir: tempDir + "/original",
 	}
-	
+
 	tenantMgr := tenant.NewManager(tenantsFile)
 	err = tenantMgr.LoadFromFile()
 	assert.NoError(t, err)
@@ -595,10 +594,10 @@ func TestServerWithTenantManager(t *testing.T) {
 			},
 		},
 	}
-	
+
 	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
 	assert.NoError(t, err)
-	
+
 	err = os.WriteFile(tenantsFile, configData, 0644)
 	assert.NoError(t, err)
 

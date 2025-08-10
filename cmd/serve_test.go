@@ -28,38 +28,38 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 			},
 		},
 	}
-	
+
 	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
 	require.NoError(t, err)
-	
+
 	err = os.WriteFile(tenantsFile, configData, 0644)
 	require.NoError(t, err)
 
 	tests := []struct {
-		name                    string
-		args                    []string
-		expectedGlobalDir       string
-		expectedPort            int
-		expectedHost            string
-		expectedLogLevel        string
-		expectedAutoCreate      bool
-		expectedOverrides       map[string]bool
-		description             string
+		name               string
+		args               []string
+		expectedGlobalDir  string
+		expectedPort       int
+		expectedHost       string
+		expectedLogLevel   string
+		expectedAutoCreate bool
+		expectedOverrides  map[string]bool
+		description        string
 	}{
 		{
-			name: "No command line flags",
-			args: []string{"serve"},
-			expectedGlobalDir: "",  // Will be set from env default
-			expectedPort: 0,       // Will be set from env default
-			expectedHost: "",      // Will be set from env default
-			expectedLogLevel: "",  // Will be set from env default
+			name:               "No command line flags",
+			args:               []string{"serve"},
+			expectedGlobalDir:  "",    // Will be set from env default
+			expectedPort:       0,     // Will be set from env default
+			expectedHost:       "",    // Will be set from env default
+			expectedLogLevel:   "",    // Will be set from env default
 			expectedAutoCreate: false, // Will be set from env default
-			expectedOverrides: map[string]bool{},
-			description: "No flags should result in no overrides",
+			expectedOverrides:  map[string]bool{},
+			description:        "No flags should result in no overrides",
 		},
 		{
-			name: "Global dir flag only",
-			args: []string{"serve", "--global-dir", tempDir + "/cmdline"},
+			name:              "Global dir flag only",
+			args:              []string{"serve", "--global-dir", tempDir + "/cmdline"},
 			expectedGlobalDir: tempDir + "/cmdline",
 			expectedOverrides: map[string]bool{
 				"global-dir": true,
@@ -68,7 +68,7 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 		},
 		{
 			name: "Multiple flags",
-			args: []string{"serve", 
+			args: []string{"serve",
 				"--global-dir", tempDir + "/multi",
 				"--port", "8080",
 				"--host", "127.0.0.1",
@@ -76,14 +76,14 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 				"--no-dashboard",
 			},
 			expectedGlobalDir: tempDir + "/multi",
-			expectedPort: 8080,
-			expectedHost: "127.0.0.1",
-			expectedLogLevel: "debug",
+			expectedPort:      8080,
+			expectedHost:      "127.0.0.1",
+			expectedLogLevel:  "debug",
 			expectedOverrides: map[string]bool{
-				"global-dir": true,
-				"port": true,
-				"host": true,
-				"log-level": true,
+				"global-dir":   true,
+				"port":         true,
+				"host":         true,
+				"log-level":    true,
 				"no-dashboard": true,
 			},
 			description: "All specified flags should be marked as overrides",
@@ -96,7 +96,7 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 			},
 			expectedAutoCreate: false,
 			expectedOverrides: map[string]bool{
-				"in-memory": true,
+				"in-memory":          true,
 				"auto-create-bucket": true,
 			},
 			description: "Boolean flags should be tracked correctly",
@@ -111,10 +111,10 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 				RunE: func(cmd *cobra.Command, args []string) error {
 					// Load base config
 					serveCfg := config.LoadFromEnv()
-					
+
 					// Track which options were set via command line
 					cmdLineOverrides := make(map[string]bool)
-					
+
 					// Check each flag - this mimics the actual serve.go logic
 					if port, _ := cmd.Flags().GetInt("port"); cmd.Flags().Changed("port") {
 						serveCfg.Port = port
@@ -168,7 +168,7 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 
 					// Verify expected overrides
 					assert.Equal(t, tt.expectedOverrides, cmdLineOverrides, tt.description)
-					
+
 					// Verify specific values if specified in test
 					if tt.expectedGlobalDir != "" {
 						assert.Equal(t, tt.expectedGlobalDir, serveCfg.GlobalDir)
@@ -215,9 +215,9 @@ func TestCmdLineOverrideTracking(t *testing.T) {
 // TestFlagParsing tests that flags are parsed correctly
 func TestFlagParsing(t *testing.T) {
 	tests := []struct {
-		name     string
-		args     []string
-		checkFn  func(*testing.T, *cobra.Command)
+		name    string
+		args    []string
+		checkFn func(*testing.T, *cobra.Command)
 	}{
 		{
 			name: "Port flag parsing",
@@ -229,7 +229,7 @@ func TestFlagParsing(t *testing.T) {
 			},
 		},
 		{
-			name: "Global dir flag parsing", 
+			name: "Global dir flag parsing",
 			args: []string{"serve", "--global-dir", "/tmp/test"},
 			checkFn: func(t *testing.T, cmd *cobra.Command) {
 				globalDir, _ := cmd.Flags().GetString("global-dir")
@@ -262,11 +262,11 @@ func TestFlagParsing(t *testing.T) {
 				port, _ := cmd.Flags().GetInt("port")
 				host, _ := cmd.Flags().GetString("host")
 				logLevel, _ := cmd.Flags().GetString("log-level")
-				
+
 				assert.Equal(t, 9000, port)
 				assert.Equal(t, "localhost", host)
 				assert.Equal(t, "debug", logLevel)
-				
+
 				assert.True(t, cmd.Flags().Changed("port"))
 				assert.True(t, cmd.Flags().Changed("host"))
 				assert.True(t, cmd.Flags().Changed("log-level"))

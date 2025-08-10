@@ -17,7 +17,7 @@ import (
 )
 
 func setupTestHandler(t *testing.T) (*Handler, *gin.Engine) {
-	cfg := testutil.NewTestConfig(t, 
+	cfg := testutil.NewTestConfig(t,
 		testutil.WithPort(8080),
 		testutil.WithAuthMode("none"),
 	)

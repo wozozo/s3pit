@@ -37,8 +37,6 @@ func WithAutoCreateBucket(enabled bool) ConfigOption {
 	}
 }
 
-
-
 // WithInMemory sets whether to use in-memory storage
 func WithInMemory(inMemory bool) ConfigOption {
 	return func(cfg *config.Config) {
@@ -71,27 +69,27 @@ func SetupTestStorage(t *testing.T, inMemory bool) storage.Storage {
 	if inMemory {
 		return storage.NewMemoryStorage()
 	}
-	
+
 	tempDir := t.TempDir()
 	fs, err := storage.NewFileSystemStorage(tempDir)
 	if err != nil {
 		t.Fatalf("Failed to create filesystem storage: %v", err)
 	}
-	
+
 	return fs
 }
 
 // SetupTestStorageWithBuckets creates storage with pre-created buckets
 func SetupTestStorageWithBuckets(t *testing.T, inMemory bool, buckets ...string) storage.Storage {
 	store := SetupTestStorage(t, inMemory)
-	
+
 	for _, bucket := range buckets {
 		_, err := store.CreateBucket(bucket)
 		if err != nil {
 			t.Fatalf("Failed to create bucket %s: %v", bucket, err)
 		}
 	}
-	
+
 	return store
 }
 

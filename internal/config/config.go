@@ -73,7 +73,7 @@ func (c *Config) UpdateGlobalDirFromTenants(tenantManager interface{}, skipUpdat
 	if skipUpdate {
 		return // Don't override explicit setting
 	}
-	
+
 	// Use reflection-like interface to avoid circular dependency
 	if tm, ok := tenantManager.(interface {
 		GetGlobalDir() string

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
-	
+
 	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
@@ -27,7 +27,7 @@ func NewFileSystemMultipartManager(baseDir string) *FileSystemMultipartManager {
 // InitiateUpload creates a new multipart upload and prepares filesystem
 func (m *FileSystemMultipartManager) InitiateUpload(bucket, key string) (string, error) {
 	uploadId := fmt.Sprintf("upload-%d-%s", time.Now().UnixNano(), key)
-	
+
 	upload := &MultipartUpload{
 		Bucket:    bucket,
 		Key:       key,
@@ -35,16 +35,16 @@ func (m *FileSystemMultipartManager) InitiateUpload(bucket, key string) (string,
 		Initiated: time.Now().UTC(),
 		Parts:     make(map[int]PartInfo),
 	}
-	
+
 	m.uploads.Store(uploadId, upload)
-	
+
 	// Create temporary directory for parts
 	tempDir := filepath.Join(m.baseDir, ".s3pit_uploads", uploadId)
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
 		m.uploads.Delete(uploadId)
 		return "", storageerrors.WrapFileSystemError(tempDir, "create directory", err)
 	}
-	
+
 	return uploadId, nil
 }
 
@@ -63,16 +63,16 @@ func (m *FileSystemMultipartManager) StorePart(uploadId string, partNumber int, 
 	if !exists {
 		return "", storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
-	
+
 	// Save part to temporary file
 	partPath := filepath.Join(m.baseDir, ".s3pit_uploads", uploadId, fmt.Sprintf("part-%d", partNumber))
-	
+
 	partFile, err := os.Create(partPath)
 	if err != nil {
 		return "", err
 	}
 	defer partFile.Close()
-	
+
 	// Read part data
 	data := make([]byte, size)
 	n, err := io.ReadFull(reader, data)
@@ -80,16 +80,16 @@ func (m *FileSystemMultipartManager) StorePart(uploadId string, partNumber int, 
 		return "", err
 	}
 	data = data[:n]
-	
+
 	// Write to part file
 	written, err := partFile.Write(data)
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Calculate ETag
 	etag := CalculateETag(data)
-	
+
 	// Update upload parts
 	upload.Parts[partNumber] = PartInfo{
 		PartNumber:   partNumber,
@@ -97,7 +97,7 @@ func (m *FileSystemMultipartManager) StorePart(uploadId string, partNumber int, 
 		ETag:         etag,
 		LastModified: time.Now().UTC(),
 	}
-	
+
 	return etag, nil
 }
 
@@ -112,19 +112,19 @@ func (m *FileSystemMultipartManager) ListParts(uploadId string) ([]PartInfo, err
 	if !exists {
 		return nil, storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
-	
+
 	parts := make([]PartInfo, 0, len(upload.Parts))
 	for _, part := range upload.Parts {
 		parts = append(parts, part)
 	}
-	
+
 	return parts, nil
 }
 
 // DeleteUpload removes an upload and its parts from filesystem
 func (m *FileSystemMultipartManager) DeleteUpload(uploadId string) error {
 	m.uploads.Delete(uploadId)
-	
+
 	// Remove temporary directory
 	uploadDir := filepath.Join(m.baseDir, ".s3pit_uploads", uploadId)
 	return os.RemoveAll(uploadDir)
@@ -133,7 +133,7 @@ func (m *FileSystemMultipartManager) DeleteUpload(uploadId string) error {
 // ListUploads returns all active uploads for a bucket
 func (m *FileSystemMultipartManager) ListUploads(bucket string) []*MultipartUpload {
 	var uploads []*MultipartUpload
-	
+
 	m.uploads.Range(func(key, value interface{}) bool {
 		upload := value.(*MultipartUpload)
 		if upload.Bucket == bucket {
@@ -141,6 +141,6 @@ func (m *FileSystemMultipartManager) ListUploads(bucket string) []*MultipartUplo
 		}
 		return true
 	})
-	
+
 	return uploads
 }

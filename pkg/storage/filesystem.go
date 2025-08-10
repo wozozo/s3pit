@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	
+
 	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
@@ -46,19 +46,19 @@ func (fs *FileSystemStorage) getBucketLock(bucket string) *sync.RWMutex {
 func (fs *FileSystemStorage) saveMetadata(bucket, key string, metadata *ObjectMetadata) error {
 	objectPath := filepath.Join(fs.baseDir, bucket, key)
 	metaPath := objectPath + ".s3pit_meta.json"
-	
+
 	meta := map[string]interface{}{
 		"content-type": metadata.ContentType,
 		"etag":         StripETagQuotes(metadata.ETag),
 		"size":         metadata.Size,
 		"modified":     metadata.LastModified,
 	}
-	
+
 	metaData, err := json.Marshal(meta)
 	if err != nil {
 		return err
 	}
-	
+
 	return os.WriteFile(metaPath, metaData, 0644)
 }
 

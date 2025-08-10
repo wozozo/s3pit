@@ -1,8 +1,8 @@
 package storage
 
 import (
-	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"fmt"
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"sync"
 	"time"
 )
@@ -25,10 +25,10 @@ func NewMultipartManager() *MultipartManager {
 // InitiateUpload creates a new multipart upload
 func (m *MultipartManager) InitiateUpload(bucket, key string) (string, error) {
 	uploadId := fmt.Sprintf("upload-%d-%s", time.Now().UnixNano(), key)
-	
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.uploads[uploadId] = &MultipartUpload{
 		Bucket:    bucket,
 		Key:       key,
@@ -37,7 +37,7 @@ func (m *MultipartManager) InitiateUpload(bucket, key string) (string, error) {
 		Parts:     make(map[int]PartInfo),
 	}
 	m.parts[uploadId] = make(map[int][]byte)
-	
+
 	return uploadId, nil
 }
 
@@ -45,7 +45,7 @@ func (m *MultipartManager) InitiateUpload(bucket, key string) (string, error) {
 func (m *MultipartManager) GetUpload(uploadId string) (*MultipartUpload, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	upload, exists := m.uploads[uploadId]
 	return upload, exists
 }
@@ -54,25 +54,25 @@ func (m *MultipartManager) GetUpload(uploadId string) (*MultipartUpload, bool) {
 func (m *MultipartManager) StorePart(uploadId string, partNumber int, data []byte, etag string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	upload, exists := m.uploads[uploadId]
 	if !exists {
 		return storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
-	
+
 	// Store part data
 	if m.parts[uploadId] == nil {
 		m.parts[uploadId] = make(map[int][]byte)
 	}
 	m.parts[uploadId][partNumber] = data
-	
+
 	// Update part info
 	upload.Parts[partNumber] = PartInfo{
 		PartNumber: partNumber,
 		ETag:       etag,
 		Size:       int64(len(data)),
 	}
-	
+
 	return nil
 }
 
@@ -80,7 +80,7 @@ func (m *MultipartManager) StorePart(uploadId string, partNumber int, data []byt
 func (m *MultipartManager) GetParts(uploadId string) (map[int][]byte, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	parts, exists := m.parts[uploadId]
 	return parts, exists
 }
@@ -89,17 +89,17 @@ func (m *MultipartManager) GetParts(uploadId string) (map[int][]byte, bool) {
 func (m *MultipartManager) ListParts(uploadId string) ([]PartInfo, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	upload, exists := m.uploads[uploadId]
 	if !exists {
 		return nil, storageerrors.WrapMultipartError(uploadId, storageerrors.ErrUploadNotFound)
 	}
-	
+
 	parts := make([]PartInfo, 0, len(upload.Parts))
 	for _, part := range upload.Parts {
 		parts = append(parts, part)
 	}
-	
+
 	return parts, nil
 }
 
@@ -107,10 +107,10 @@ func (m *MultipartManager) ListParts(uploadId string) ([]PartInfo, error) {
 func (m *MultipartManager) DeleteUpload(uploadId string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	delete(m.uploads, uploadId)
 	delete(m.parts, uploadId)
-	
+
 	return nil
 }
 
@@ -118,13 +118,13 @@ func (m *MultipartManager) DeleteUpload(uploadId string) error {
 func (m *MultipartManager) ListUploads(bucket string) []*MultipartUpload {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	var uploads []*MultipartUpload
 	for _, upload := range m.uploads {
 		if upload.Bucket == bucket {
 			uploads = append(uploads, upload)
 		}
 	}
-	
+
 	return uploads
 }

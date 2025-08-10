@@ -8,36 +8,36 @@ import (
 // Storage errors
 var (
 	// Bucket-related errors
-	ErrBucketNotFound      = errors.New("bucket not found")
-	ErrBucketNotEmpty      = errors.New("bucket not empty")
-	ErrBucketExists        = errors.New("bucket already exists")
-	ErrInvalidBucketName   = errors.New("invalid bucket name")
-	ErrBucketNameEmpty     = errors.New("bucket name cannot be empty")
-	ErrBucketNameTooLong   = errors.New("bucket name must be between 3 and 63 characters")
-	ErrBucketNameInvalidChar = errors.New("bucket name contains invalid character")
+	ErrBucketNotFound          = errors.New("bucket not found")
+	ErrBucketNotEmpty          = errors.New("bucket not empty")
+	ErrBucketExists            = errors.New("bucket already exists")
+	ErrInvalidBucketName       = errors.New("invalid bucket name")
+	ErrBucketNameEmpty         = errors.New("bucket name cannot be empty")
+	ErrBucketNameTooLong       = errors.New("bucket name must be between 3 and 63 characters")
+	ErrBucketNameInvalidChar   = errors.New("bucket name contains invalid character")
 	ErrBucketNameInvalidFormat = errors.New("bucket name cannot be formatted as an IP address")
-	
+
 	// Object-related errors
-	ErrObjectNotFound      = errors.New("object not found")
-	ErrInvalidObjectKey    = errors.New("invalid object key")
-	ErrObjectKeyEmpty      = errors.New("object key cannot be empty")
-	ErrObjectKeyTooLong    = errors.New("object key is too long (max 1024 bytes)")
-	ErrObjectKeyNullBytes  = errors.New("object key cannot contain null bytes")
-	
+	ErrObjectNotFound     = errors.New("object not found")
+	ErrInvalidObjectKey   = errors.New("invalid object key")
+	ErrObjectKeyEmpty     = errors.New("object key cannot be empty")
+	ErrObjectKeyTooLong   = errors.New("object key is too long (max 1024 bytes)")
+	ErrObjectKeyNullBytes = errors.New("object key cannot contain null bytes")
+
 	// Multipart upload errors
-	ErrUploadNotFound      = errors.New("upload not found")
-	ErrUploadMismatch      = errors.New("upload mismatch")
-	ErrPartNotFound        = errors.New("part not found")
-	
+	ErrUploadNotFound = errors.New("upload not found")
+	ErrUploadMismatch = errors.New("upload mismatch")
+	ErrPartNotFound   = errors.New("part not found")
+
 	// Directory/file system errors
-	ErrDirectoryCreation   = errors.New("failed to create directory")
-	ErrFileCreation        = errors.New("failed to create file")
-	ErrFileWrite           = errors.New("failed to write file")
-	ErrFileRead            = errors.New("failed to read file")
-	ErrFileMove            = errors.New("failed to move file")
-	
+	ErrDirectoryCreation = errors.New("failed to create directory")
+	ErrFileCreation      = errors.New("failed to create file")
+	ErrFileWrite         = errors.New("failed to write file")
+	ErrFileRead          = errors.New("failed to read file")
+	ErrFileMove          = errors.New("failed to move file")
+
 	// Policy errors
-	ErrPolicyParseFailed   = errors.New("failed to parse bucket policy")
+	ErrPolicyParseFailed = errors.New("failed to parse bucket policy")
 )
 
 // WrapStorageError wraps a storage error with operation context

@@ -3,7 +3,7 @@ package storage
 import (
 	"io"
 	"time"
-	
+
 	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 )
 

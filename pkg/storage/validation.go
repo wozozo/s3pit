@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	
+
 	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
@@ -15,34 +15,34 @@ func ValidateBucketName(bucket string) error {
 	if bucket == "" {
 		return storageerrors.ErrBucketNameEmpty
 	}
-	
+
 	// S3 bucket naming rules
 	if len(bucket) < 3 || len(bucket) > 63 {
 		return storageerrors.ErrBucketNameTooLong
 	}
-	
+
 	// Must start and end with lowercase letter or number
 	if !isAlphanumeric(bucket[0]) || !isAlphanumeric(bucket[len(bucket)-1]) {
 		return storageerrors.ErrBucketNameInvalidChar
 	}
-	
+
 	// Check for invalid characters and consecutive dots/hyphens
 	for i, ch := range bucket {
 		if !isValidBucketChar(ch) {
 			return storageerrors.ErrBucketNameInvalidChar
 		}
-		
+
 		// No consecutive dots or hyphens
 		if i > 0 && (ch == '.' || ch == '-') && bucket[i-1] == byte(ch) {
 			return storageerrors.ErrBucketNameInvalidChar
 		}
 	}
-	
+
 	// Cannot be formatted as IP address
 	if looksLikeIPAddress(bucket) {
 		return storageerrors.ErrBucketNameInvalidFormat
 	}
-	
+
 	return nil
 }
 
@@ -51,17 +51,17 @@ func ValidateObjectKey(key string) error {
 	if key == "" {
 		return storageerrors.ErrObjectKeyEmpty
 	}
-	
+
 	// Check for null bytes
 	if strings.Contains(key, "\x00") {
 		return storageerrors.ErrObjectKeyNullBytes
 	}
-	
+
 	// Key length limit (S3 limit is 1024 bytes)
 	if len(key) > 1024 {
 		return storageerrors.ErrObjectKeyTooLong
 	}
-	
+
 	return nil
 }
 
@@ -74,16 +74,16 @@ func CalculateETag(data []byte) string {
 // CalculateETagFromReader calculates the ETag from an io.Reader
 func CalculateETagFromReader(reader io.Reader) (string, int64, []byte, error) {
 	hash := md5.New()
-	
+
 	// Buffer to store the data for potential reuse
 	var buf []byte
 	teeReader := io.TeeReader(reader, &writerBuffer{&buf})
-	
+
 	written, err := io.Copy(hash, teeReader)
 	if err != nil {
 		return "", 0, nil, storageerrors.WrapStorageError("calculate hash", err)
 	}
-	
+
 	etag := fmt.Sprintf("\"%s\"", hex.EncodeToString(hash.Sum(nil)))
 	return etag, written, buf, nil
 }
@@ -108,9 +108,9 @@ func isAlphanumeric(ch byte) bool {
 }
 
 func isValidBucketChar(ch rune) bool {
-	return (ch >= 'a' && ch <= 'z') || 
-		   (ch >= '0' && ch <= '9') || 
-		   ch == '.' || ch == '-'
+	return (ch >= 'a' && ch <= 'z') ||
+		(ch >= '0' && ch <= '9') ||
+		ch == '.' || ch == '-'
 }
 
 func looksLikeIPAddress(s string) bool {
@@ -118,24 +118,24 @@ func looksLikeIPAddress(s string) bool {
 	if len(parts) != 4 {
 		return false
 	}
-	
+
 	for _, part := range parts {
 		if len(part) == 0 || len(part) > 3 {
 			return false
 		}
-		
+
 		// Check if all characters are digits
 		for _, ch := range part {
 			if ch < '0' || ch > '9' {
 				return false
 			}
 		}
-		
+
 		// Check if it's a valid octet (0-255)
 		if len(part) > 1 && part[0] == '0' {
 			return false // No leading zeros
 		}
-		
+
 		val := 0
 		for _, ch := range part {
 			val = val*10 + int(ch-'0')
@@ -144,7 +144,7 @@ func looksLikeIPAddress(s string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 

@@ -41,7 +41,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	// Track which options were set via command line
 	cmdLineOverrides := make(map[string]bool)
-	
+
 	// Override with command line flags
 	if port, _ := cmd.Flags().GetInt("port"); cmd.Flags().Changed("port") {
 		serveCfg.Port = port
@@ -121,12 +121,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("✅ Configuration validation successful")
-	fmt.Println("")
 
-	// Print configuration in debug mode
-	if serveCfg.LogLevel == "debug" {
-		cmd.Printf("Starting S3pit with configuration:\n%s\n", serveCfg.String())
-	}
+	// Display current configuration
+	fmt.Printf("Current configuration:\n%s\n\n", serveCfg.String())
 
 	// Create and start server
 	srv, err := server.NewWithCmdLineOverrides(serveCfg, cmdLineOverrides)

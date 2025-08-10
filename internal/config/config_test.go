@@ -38,12 +38,12 @@ func TestLoadFromEnv(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name     string
-		envVars  map[string]string
-		checkFn  func(*testing.T, *Config)
+		name    string
+		envVars map[string]string
+		checkFn func(*testing.T, *Config)
 	}{
 		{
-			name: "Default values",
+			name:    "Default values",
 			envVars: map[string]string{},
 			checkFn: func(t *testing.T, cfg *Config) {
 				assert.Equal(t, "0.0.0.0", cfg.Host)
@@ -58,12 +58,12 @@ func TestLoadFromEnv(t *testing.T) {
 		{
 			name: "Custom env values",
 			envVars: map[string]string{
-				"S3PIT_HOST":             "127.0.0.1",
-				"S3PIT_PORT":             "8080",
-				"S3PIT_GLOBAL_DIRECTORY": "/custom/path",
-				"S3PIT_AUTH_MODE":        "sigv4",
-				"S3PIT_LOG_LEVEL":        "debug",
-				"S3PIT_ENABLE_DASHBOARD": "false",
+				"S3PIT_HOST":               "127.0.0.1",
+				"S3PIT_PORT":               "8080",
+				"S3PIT_GLOBAL_DIRECTORY":   "/custom/path",
+				"S3PIT_AUTH_MODE":          "sigv4",
+				"S3PIT_LOG_LEVEL":          "debug",
+				"S3PIT_ENABLE_DASHBOARD":   "false",
 				"S3PIT_AUTO_CREATE_BUCKET": "false",
 			},
 			checkFn: func(t *testing.T, cfg *Config) {
@@ -110,10 +110,10 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 			},
 		},
 	}
-	
+
 	configData, err := json.MarshalIndent(tenantsConfig, "", "  ")
 	require.NoError(t, err)
-	
+
 	err = os.WriteFile(tenantsFile, configData, 0644)
 	require.NoError(t, err)
 
@@ -162,15 +162,15 @@ func TestUpdateGlobalDirFromTenants(t *testing.T) {
 				// Create a tenant manager with empty globalDir
 				emptyTenantsConfig := tenant.TenantsConfig{
 					GlobalDir: "", // Empty
-					Tenants: tenantsConfig.Tenants,
+					Tenants:   tenantsConfig.Tenants,
 				}
 				emptyConfigData, err := json.MarshalIndent(emptyTenantsConfig, "", "  ")
 				require.NoError(t, err)
-				
+
 				emptyTenantsFile := filepath.Join(tempDir, "empty-tenants.json")
 				err = os.WriteFile(emptyTenantsFile, emptyConfigData, 0644)
 				require.NoError(t, err)
-				
+
 				tenantMgr = tenant.NewManager(emptyTenantsFile)
 				err = tenantMgr.LoadFromFile()
 				require.NoError(t, err)
@@ -269,7 +269,7 @@ func TestConfigValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorMsg)
@@ -294,7 +294,7 @@ func TestConfigString(t *testing.T) {
 	}
 
 	str := cfg.String()
-	
+
 	// Check that the string contains expected values
 	assert.Contains(t, str, "Host: localhost")
 	assert.Contains(t, str, "Port: 3333")

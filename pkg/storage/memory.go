@@ -1,9 +1,9 @@
 package storage
 
 import (
-	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"bytes"
 	"fmt"
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"io"
 	"sort"
 	"strings"
@@ -24,9 +24,9 @@ type memoryBucket struct {
 }
 
 type MemoryStorage struct {
-	buckets         map[string]*memoryBucket
-	mu              sync.RWMutex
-	multipartMgr    *MultipartManager
+	buckets      map[string]*memoryBucket
+	mu           sync.RWMutex
+	multipartMgr *MultipartManager
 }
 
 func NewMemoryStorage() *MemoryStorage {
@@ -350,7 +350,7 @@ func (m *MemoryStorage) CompleteMultipartUpload(bucket, key, uploadId string, pa
 	}
 
 	uploadParts, _ := m.multipartMgr.GetParts(uploadId)
-	
+
 	// Combine all parts
 	var finalData []byte
 	for _, part := range parts {

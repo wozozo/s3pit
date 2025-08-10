@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-	
+
 	autherrors "github.com/wozozo/s3pit/pkg/errors"
 )
 

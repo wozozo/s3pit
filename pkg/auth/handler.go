@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-	
+
 	autherrors "github.com/wozozo/s3pit/pkg/errors"
 )
 
@@ -59,7 +59,6 @@ func (h *handler) Authenticate(r *http.Request) (string, error) {
 		return "", autherrors.ErrAuthModeNotConfigured
 	}
 }
-
 
 func (h *handler) authenticateSigV4(r *http.Request) (string, error) {
 	// Store current request for use in helper methods

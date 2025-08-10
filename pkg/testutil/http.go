@@ -52,7 +52,7 @@ func MakeTestRequest(t *testing.T, router *gin.Engine, req TestRequest) *TestRes
 
 	// Create response recorder
 	recorder := httptest.NewRecorder()
-	
+
 	// Process request
 	router.ServeHTTP(recorder, httpReq)
 

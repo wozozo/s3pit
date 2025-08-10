@@ -25,10 +25,10 @@ var templateFS embed.FS
 var staticFS embed.FS
 
 type Handler struct {
-	storage         storage.Storage
-	tenant          *tenant.Manager
-	authMode        string
-	region          string
+	storage  storage.Storage
+	tenant   *tenant.Manager
+	authMode string
+	region   string
 }
 
 func NewHandler(s storage.Storage, tm *tenant.Manager, authMode, region string) *Handler {
@@ -36,10 +36,10 @@ func NewHandler(s storage.Storage, tm *tenant.Manager, authMode, region string) 
 		region = "us-east-1"
 	}
 	return &Handler{
-		storage:         s,
-		tenant:          tm,
-		authMode:        authMode,
-		region:          region,
+		storage:  s,
+		tenant:   tm,
+		authMode: authMode,
+		region:   region,
 	}
 }
 

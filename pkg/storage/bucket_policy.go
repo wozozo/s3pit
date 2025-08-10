@@ -1,9 +1,9 @@
 package storage
 
 import (
-	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"encoding/json"
 	"fmt"
+	storageerrors "github.com/wozozo/s3pit/pkg/errors"
 	"strings"
 )
 

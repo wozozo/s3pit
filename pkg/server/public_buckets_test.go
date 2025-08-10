@@ -78,7 +78,6 @@ func (h *testAuthHandlerForPublicBuckets) Authenticate(r *http.Request) (string,
 	return "", fmt.Errorf("invalid authorization")
 }
 
-
 func setupTestServerWithPublicBuckets(t *testing.T) (*Server, string, func()) {
 	// Initialize test mode
 	testutil.InitTestMode()

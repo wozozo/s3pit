@@ -8,37 +8,37 @@ import (
 // Authentication errors
 var (
 	// Auth mode errors
-	ErrInvalidAuthMode     = errors.New("invalid auth mode")
+	ErrInvalidAuthMode       = errors.New("invalid auth mode")
 	ErrAuthModeNotConfigured = errors.New("authentication mode not configured")
-	
+
 	// Authorization header errors
-	ErrMissingAuthHeader   = errors.New("missing authorization header")
-	ErrInvalidAuthHeader   = errors.New("invalid authorization header")
-	ErrInvalidAuthFormat   = errors.New("invalid authorization header format")
-	ErrIncompleteAuthHeader = errors.New("incomplete authorization header")
+	ErrMissingAuthHeader      = errors.New("missing authorization header")
+	ErrInvalidAuthHeader      = errors.New("invalid authorization header")
+	ErrInvalidAuthFormat      = errors.New("invalid authorization header format")
+	ErrIncompleteAuthHeader   = errors.New("incomplete authorization header")
 	ErrUnsupportedAuthVersion = errors.New("only AWS Signature Version 4 is supported")
-	
+
 	// Credential errors
-	ErrMissingAccessKey    = errors.New("missing access key")
-	ErrInvalidAccessKey    = errors.New("invalid access key")
-	ErrAccessKeyNotFound   = errors.New("access key not found")
-	ErrMissingCredential   = errors.New("missing credential")
-	ErrInvalidCredential   = errors.New("invalid credential format")
-	
+	ErrMissingAccessKey  = errors.New("missing access key")
+	ErrInvalidAccessKey  = errors.New("invalid access key")
+	ErrAccessKeyNotFound = errors.New("access key not found")
+	ErrMissingCredential = errors.New("missing credential")
+	ErrInvalidCredential = errors.New("invalid credential format")
+
 	// Signature errors
-	ErrInvalidAlgorithm    = errors.New("invalid algorithm")
-	ErrMissingSignature    = errors.New("missing signature")
-	ErrSignatureMismatch   = errors.New("signature mismatch")
+	ErrInvalidAlgorithm     = errors.New("invalid algorithm")
+	ErrMissingSignature     = errors.New("missing signature")
+	ErrSignatureMismatch    = errors.New("signature mismatch")
 	ErrMissingSignedHeaders = errors.New("missing signed headers")
-	
+
 	// Date/time errors
-	ErrMissingDate         = errors.New("missing date")
-	ErrInvalidDateFormat   = errors.New("invalid date format")
+	ErrMissingDate          = errors.New("missing date")
+	ErrInvalidDateFormat    = errors.New("invalid date format")
 	ErrInvalidExpiresFormat = errors.New("invalid expires format")
-	ErrPresignedURLExpired = errors.New("presigned URL has expired")
-	
+	ErrPresignedURLExpired  = errors.New("presigned URL has expired")
+
 	// Tenant errors
-	ErrNoTenantManager     = errors.New("no tenant manager configured")
+	ErrNoTenantManager = errors.New("no tenant manager configured")
 )
 
 // WrapAuthError wraps an authentication error with context

@@ -50,7 +50,6 @@ func (h *MultiTenantHandler) Authenticate(r *http.Request) (string, error) {
 	}
 }
 
-
 func (h *MultiTenantHandler) extractAccessKey(r *http.Request) string {
 	// Try to extract from Authorization header
 	authHeader := r.Header.Get("Authorization")

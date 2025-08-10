@@ -59,7 +59,7 @@ func NewWithCmdLineOverrides(cfg *config.Config, cmdLineOverrides map[string]boo
 			// Update config with dataDir from tenants.json if available
 			// Skip update if GlobalDir was explicitly set via command line
 			cfg.UpdateGlobalDirFromTenants(tenantMgr, cmdLineOverrides["global-dir"])
-			
+
 			// Sync the final GlobalDir to tenantMgr
 			tenantMgr.UpdateGlobalDir(cfg.GlobalDir)
 		}
