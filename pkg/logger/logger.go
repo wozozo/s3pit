@@ -89,10 +89,10 @@ func GetInstance() *Logger {
 			currentLevel:  INFO,
 			rotationSize:  100 * 1024 * 1024, // 100MB
 			enableConsole: true,
-			enableFile:    true,
-			logDir:        "./logs",
+			enableFile:    false, // Default to false, will be set by server initialization
+			logDir:        "",    // Default to empty, will be set by server initialization
 		}
-		instance.initLogFile()
+		// Don't initialize log file here - let the server configuration decide
 	})
 	return instance
 }

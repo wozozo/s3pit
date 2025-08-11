@@ -226,8 +226,8 @@ s3pit serve --auth-mode sigv4
 # In-memory storage for testing (data lost on restart)
 s3pit serve --in-memory
 
-# Custom data directory with logging
-s3pit serve --global-dir /var/s3pit/data --log-level debug
+# Custom data directory with file logging
+s3pit serve --global-dir /var/s3pit/data --log-dir ./logs --log-level debug
 ```
 
 ### 2. Configure Your Application
@@ -354,7 +354,7 @@ Options:
   --dashboard                 Enable web dashboard (default true)
   --auto-create-bucket        Auto-create buckets on upload (default true)
   --log-level string          Log level: debug|info|warn|error (default "info")
-  --log-dir string            Directory for log files (default "./logs")
+  --log-dir string            Directory for log files (empty = console only)
   --no-dashboard              Disable web dashboard
   --max-object-size int       Maximum object size in bytes (default 5368709120)
   --read-delay-ms int         Fixed delay for read operations in milliseconds
@@ -378,8 +378,7 @@ All command-line options can be configured via environment variables with the `S
 | `S3PIT_IN_MEMORY` | bool | false | Store all data in memory (lost on restart) |
 | `S3PIT_AUTO_CREATE_BUCKET` | bool | true | Auto-create buckets on first upload |
 | `S3PIT_LOG_LEVEL` | string | "info" | Minimum log level: debug, info, warn, error |
-| `S3PIT_LOG_DIR` | string | "./logs" | Directory for log files |
-| `S3PIT_ENABLE_FILE_LOG` | bool | true | Write logs to files |
+| `S3PIT_LOG_DIR` | string | "" | Directory for log files (empty = console only) |
 | `S3PIT_ENABLE_CONSOLE_LOG` | bool | true | Write logs to console |
 | `S3PIT_LOG_ROTATION_SIZE` | int | 104857600 | Log rotation size in bytes (default 100MB) |
 | `S3PIT_MAX_LOG_ENTRIES` | int | 10000 | Max in-memory log entries for dashboard |
@@ -425,7 +424,7 @@ S3pit provides comprehensive logging capabilities for monitoring and debugging:
 - **Sensitive data filtering**: Automatically removes Authorization headers from logs
 
 #### Log Files
-Logs are stored in JSON format at `./logs/s3pit_YYYY-MM-DD.log`. Example entry:
+When file logging is enabled by specifying `--log-dir`, logs are stored in JSON format at `{log-dir}/s3pit_YYYY-MM-DD.log`. Example entry:
 ```json
 {
   "id": "1754736444664422000-93654",
@@ -901,7 +900,7 @@ s3pit serve
 # Via command line
 s3pit serve --log-level debug
 
-# Check logs
+# Check logs (if file logging is enabled)
 tail -f ./logs/s3pit_*.log | jq '.'
 ```
 

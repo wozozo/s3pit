@@ -31,8 +31,13 @@ func NewWithCmdLineOverrides(cfg *config.Config, cmdLineOverrides map[string]boo
 
 	// Initialize logger
 	logInstance := logger.GetInstance()
+
+	// Only enable file logging if LogDir is specified
 	if cfg.LogDir != "" {
 		logInstance.SetLogDir(cfg.LogDir)
+		logInstance.EnableFileLogging(true)
+	} else {
+		logInstance.EnableFileLogging(false)
 	}
 	if cfg.LogLevel != "" {
 		switch cfg.LogLevel {
@@ -46,7 +51,6 @@ func NewWithCmdLineOverrides(cfg *config.Config, cmdLineOverrides map[string]boo
 			logInstance.SetLevel(logger.ERROR)
 		}
 	}
-	logInstance.EnableFileLogging(cfg.EnableFileLog)
 	logInstance.EnableConsoleLogging(cfg.EnableConsoleLog)
 	logInstance.SetMaxEntries(cfg.MaxLogEntries)
 

@@ -66,8 +66,8 @@ func LoadFromEnv() *Config {
 		AutoCreateBucket: getEnvAsBoolOrDefault("S3PIT_AUTO_CREATE_BUCKET", true),
 		Region:           getEnvOrDefault("S3PIT_REGION", "us-east-1"),
 		LogLevel:         getEnvOrDefault("S3PIT_LOG_LEVEL", "info"),
-		LogDir:           getEnvOrDefault("S3PIT_LOG_DIR", "./logs"),
-		EnableFileLog:    getEnvAsBoolOrDefault("S3PIT_ENABLE_FILE_LOG", true),
+		LogDir:           getEnvOrDefault("S3PIT_LOG_DIR", ""),
+		EnableFileLog:    getEnvOrDefault("S3PIT_LOG_DIR", "") != "",
 		EnableConsoleLog: getEnvAsBoolOrDefault("S3PIT_ENABLE_CONSOLE_LOG", true),
 		LogRotationSize:  getEnvAsInt64OrDefault("S3PIT_LOG_ROTATION_SIZE", 100*1024*1024), // 100MB default
 		MaxLogEntries:    getEnvAsIntOrDefault("S3PIT_MAX_LOG_ENTRIES", 10000),

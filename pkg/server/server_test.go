@@ -602,12 +602,12 @@ func TestServerWithTenantManager(t *testing.T) {
 	assert.NoError(t, err)
 
 	cfg := &config.Config{
-		Port:        3333,
-		Host:        "localhost",
+		Port:       3333,
+		Host:       "localhost",
 		GlobalDir:  tempDir + "/default",
 		ConfigFile: configFile,
 		InMemory:   false,
-		AuthMode:    "sigv4",
+		AuthMode:   "sigv4",
 	}
 
 	server, err := New(cfg)

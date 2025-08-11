@@ -1,4 +1,4 @@
-.PHONY: help build run test clean
+.PHONY: help build run test clean all
 
 # Variables
 BINARY_NAME=s3pit
@@ -59,6 +59,9 @@ lint: ## Run linter
 	@which golangci-lint > /dev/null || (echo "Installing golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
 	@PATH="$$PATH:$$HOME/go/bin" golangci-lint run ./...
 	@echo "${GREEN}Linting complete!${NC}"
+
+all: build test lint fmt ## Run all checks
+	@echo "${GREEN}All checks complete!${NC}"
 
 # Release commands
 release-patch: ## Create a patch release (v0.0.X)

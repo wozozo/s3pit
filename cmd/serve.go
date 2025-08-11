@@ -48,7 +48,7 @@ func init() {
 	serveCmd.Flags().Bool("dashboard", true, "Enable web dashboard")
 	serveCmd.Flags().Bool("auto-create-bucket", true, "Automatically create buckets on first upload")
 	serveCmd.Flags().String("log-level", "info", "Log level: debug|info|warn|error")
-	serveCmd.Flags().String("log-dir", "./logs", "Directory for log files")
+	serveCmd.Flags().String("log-dir", "", "Directory for log files (empty = console only)")
 	serveCmd.Flags().Bool("no-dashboard", false, "Disable web dashboard")
 	serveCmd.Flags().Int64("max-object-size", 5368709120, "Maximum object size in bytes")
 
@@ -115,7 +115,7 @@ func formatMainConfig(cfg *config.Config) string {
 
 	// Delay Configuration
 	parts = append(parts, fmt.Sprintf("%s%sDelay Configuration:%s", ColorBold, ColorGreen, ColorReset))
-	
+
 	// Read delays
 	if cfg.ReadDelayMs > 0 {
 		parts = append(parts, fmt.Sprintf("  %sRead Delay:%s %s%dms (fixed)%s", ColorBlue, ColorReset, ColorYellow, cfg.ReadDelayMs, ColorReset))
@@ -270,6 +270,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 	if logDir, _ := cmd.Flags().GetString("log-dir"); cmd.Flags().Changed("log-dir") {
 		serveCfg.LogDir = logDir
+		serveCfg.EnableFileLog = logDir != ""
 		cmdLineOverrides["log-dir"] = true
 	}
 	if noDashboard, _ := cmd.Flags().GetBool("no-dashboard"); cmd.Flags().Changed("no-dashboard") {
