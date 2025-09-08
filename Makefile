@@ -1,9 +1,11 @@
-.PHONY: help build run test clean all
+.PHONY: help build run test clean all docker-build docker-run docker-run-detached docker-stop docker-clean docker-push docker-shell
 
 # Variables
 BINARY_NAME=s3pit
 GO=go
 GOFLAGS=-v
+DOCKER_IMAGE=s3pit
+DOCKER_TAG=latest
 
 # Colors for output
 GREEN=\033[0;32m
@@ -62,6 +64,43 @@ lint: ## Run linter
 
 all: build test lint fmt ## Run all checks
 	@echo "${GREEN}All checks complete!${NC}"
+
+# Docker commands
+docker-build: ## Build Docker image
+	@echo "${YELLOW}Building Docker image ${DOCKER_IMAGE}:${DOCKER_TAG}...${NC}"
+	docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+	@echo "${GREEN}Docker image built successfully!${NC}"
+
+docker-run: docker-build ## Build and run Docker container
+	@echo "${YELLOW}Running Docker container...${NC}"
+	docker run --rm -p 3333:3333 ${DOCKER_IMAGE}:${DOCKER_TAG}
+
+docker-run-detached: docker-build ## Build and run Docker container in detached mode
+	@echo "${YELLOW}Running Docker container in detached mode...${NC}"
+	docker run -d --name ${DOCKER_IMAGE} -p 3333:3333 ${DOCKER_IMAGE}:${DOCKER_TAG}
+	@echo "${GREEN}Container started with name: ${DOCKER_IMAGE}${NC}"
+
+docker-stop: ## Stop running Docker container
+	@echo "${YELLOW}Stopping Docker container...${NC}"
+	docker stop ${DOCKER_IMAGE} || true
+	docker rm ${DOCKER_IMAGE} || true
+	@echo "${GREEN}Container stopped and removed!${NC}"
+
+docker-clean: ## Remove Docker image and containers
+	@echo "${YELLOW}Cleaning Docker artifacts...${NC}"
+	docker stop ${DOCKER_IMAGE} 2>/dev/null || true
+	docker rm ${DOCKER_IMAGE} 2>/dev/null || true
+	docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} 2>/dev/null || true
+	@echo "${GREEN}Docker cleanup complete!${NC}"
+
+docker-push: docker-build ## Build and push Docker image to registry
+	@echo "${YELLOW}Pushing Docker image to registry...${NC}"
+	docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+	@echo "${GREEN}Docker image pushed successfully!${NC}"
+
+docker-shell: docker-build ## Run Docker container with shell access (for debugging)
+	@echo "${YELLOW}Starting Docker container with shell...${NC}"
+	docker run --rm -it --entrypoint /bin/sh ${DOCKER_IMAGE}:${DOCKER_TAG}
 
 # Release commands
 release-patch: ## Create a patch release (v0.0.X)
